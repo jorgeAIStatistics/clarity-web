@@ -1,4 +1,13 @@
+import Library from "./platform/Library.jsx";
+import {API_BASE} from "./platform/api.js";
+import PlatformMethodology from "./platform/PlatformMethodology.jsx";
+import PlatformHome from "./platform/PlatformHome.jsx";
+import ProfileBrief from "./platform/ProfileBrief.jsx";
+import {compoundBrief} from "./platform/profileModel.js";
+import {withTransition, transitionView, animateDisclosure} from "./motion/navigation.js";
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { isEvidencePath, findEvidence, entityPath, evidenceMetadata } from "./evidence/routing.js";
+const EvidenceExplorer = React.lazy(() => import("./evidence/EvidenceExplorer.jsx"));
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Search, TrendingUp, Shield, FlaskConical, Activity, Sparkles, ArrowLeft,
@@ -56,6 +65,7 @@ function parseBrowserRoute() {
   let path = window.location.pathname || "/";
   try { path = decodeURIComponent(path); } catch {}
   path = path.replace(/\/+$/, "") || "/";
+  if (isEvidencePath(path)) return { tab:"explore", path };
   if (path === "/research") return { tab:"research", request:{ clear:true } };
   if (path === "/methodology") return { tab:"research", request:{ methodology:true } };
   if (path === "/learn" || path === "/learn/basics") return { tab:"learn", learnSection:"basics" };
@@ -128,7 +138,7 @@ const T = { strong: "Strong", moderate: "Moderate", emerging: "Emerging", weak: 
 const tierColor = (t) => (t === "Strong" ? TEAL : t === "Moderate" ? AMBER : t === "Emerging" ? VIOLET : CORAL);
 
 // ===== LIVE ENGINE DATA LAYER (auto-injected) =====
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://clarity-engine-api.onrender.com").replace(/\/$/, "");
+
 
 // ===== Language (EN / ES) =====
 // UI chrome strings live here; compound PROSE is served from `*_es` fields on
@@ -138,7 +148,7 @@ const STRINGS = {
   en: {
     tagline: "Peptides, Told Straight",
     eyebrow: "PEPTIDE EVIDENCE · PUBMED + EUROPE PMC · MECHANISMS & DATA",
-    hero_1: "The peptide resource that gives you the ", hero_evidence: "science", hero_2: ", not the sales pitch.",
+    hero_1: "Compounds & ", hero_evidence: "interventions", hero_2: ".",
     search_ph: "Creatine, ashwagandha, BPC-157…",
     research: "Research", categories: "CATEGORIES", all_compounds: "All compounds",
     evidence_all: "Evidence: all", topics: "topics", topic: "topic",
@@ -156,7 +166,7 @@ const STRINGS = {
   es: {
     tagline: "Péptidos, Sin Rodeos",
     eyebrow: "EVIDENCIA DE PÉPTIDOS · PUBMED + EUROPE PMC · MECANISMOS Y DATOS",
-    hero_1: "El recurso de péptidos que te da la ", hero_evidence: "ciencia", hero_2: ", no el discurso de venta.",
+    hero_1: "Compuestos e ", hero_evidence: "intervenciones", hero_2: ".",
     search_ph: "Creatina, ashwagandha, BPC-157…",
     research: "Investigar", categories: "CATEGORÍAS", all_compounds: "Todos los compuestos",
     evidence_all: "Evidencia: todas", topics: "temas", topic: "tema",
@@ -206,13 +216,13 @@ const PEPTIDE_FAMILY_ES = {
 const GUIDE_COPY = {
   en: {
     nav_home: "Home", nav_research: "Research", nav_learn: "Learn",
-    top_tagline: "The Data, Told Straight",
+    top_tagline: "Health Evidence Platform",
     home_eyebrow: "CLARITY · EVIDENCE, EXPLAINED",
     home_title_1: "Understand the evidence ", home_title_2: "before the hype.",
     home_sub: "Peptides, supplements, and emerging compounds explained through the research behind them — from mechanism and animal models to human trials.",
     search_label: "SEARCH A COMPOUND", search_placeholder: "BPC-157, creatine, semaglutide, magnesium…", search_button: "Research",
     new_here: "Not sure where to begin?", new_here_sub: "Choose the path that matches what you want to understand. You can always jump straight into the full evidence catalog.",
-    route_basics: "I'm new here", route_basics_sub: "Learn what peptides and supplements are, and what an evidence grade actually means.", route_basics_cta: "Start the 3-minute guide",
+    route_basics: "I'm new here", route_basics_sub: "Learn how different kinds of studies answer different health questions.", route_basics_cta: "Start the 3-minute guide",
     route_compound: "I'm researching a compound", route_compound_sub: "Go straight to a profile with outcomes, evidence layers, studies, and uncertainty.", route_compound_cta: "Search above",
     route_goal: "I have a goal", route_goal_sub: "Explore example research topics by recovery, sleep, cognition, metabolic health, longevity, and skin.", route_goal_cta: "Explore areas",
     route_evidence: "I want to understand the science", route_evidence_sub: "See how ideas move from mechanisms and animal work into human evidence — and why each stage matters.", route_evidence_cta: "How evidence works",
@@ -225,7 +235,7 @@ const GUIDE_COPY = {
     human: "Human evidence", human_sub: "Does the effect actually translate to people under the conditions studied?",
     evidence_cta: "Learn how research moves from idea to evidence",
     compare_eyebrow: "SEE THE DIFFERENCE", compare_title: "The same category can hide very different evidence bases.",
-    compare_sub: "Open two peptide profiles and compare where the evidence actually lives — human trials versus predominantly preclinical research.",
+    compare_sub: "Compare evidence by question, population, and study design.",
     compare_human: "Human-research example", compare_preclinical: "Preclinical-dominant example",
     open_profile: "Open profile",
     basics_eyebrow: "START HERE", basics_title: "A short guide to reading Clarity.", basics_sub: "You do not need a research background. The goal is to understand what each kind of evidence can tell you — and what it cannot.",
@@ -251,7 +261,7 @@ const GUIDE_COPY = {
   },
   es: {
     nav_home: "Inicio", nav_research: "Investigación", nav_learn: "Aprender",
-    top_tagline: "Los datos, sin rodeos",
+    top_tagline: "Plataforma de evidencia en salud",
     home_eyebrow: "CLARITY · EVIDENCIA, EXPLICADA",
     home_title_1: "Entiende la evidencia ", home_title_2: "antes del ruido.",
     home_sub: "Péptidos, suplementos y compuestos emergentes explicados a través de la investigación que los respalda: desde mecanismos y modelos animales hasta ensayos en humanos.",
@@ -454,7 +464,7 @@ function engineClaimToOutcome(claim) {
     effectExtractionStatus: claim.effect_extraction_status || "not_assessed",
     preprintsExcluded: claim.preprints_excluded || 0,
     summary: claim.summary || null, summary_es: claim.summary_es || null,
-    headlineEffect: he ? { metric: he.metric, value: he.value, ciLow: he.ci_low, ciHigh: he.ci_high,
+    headlineEffect: he ? { metric: he.metric, value: he.value, quote: he.quote, pmid: he.pmid, status: he.status, ciLow: he.ci_low, ciHigh: he.ci_high,
       nPooled: he.n_studies_pooled, comparator: he.comparator, direction: he.direction, estimated: !!he.ci_estimated } : null,
     pmids: claim.study_ids || [],
     studies: claim.studies || [],
@@ -476,7 +486,7 @@ function engineProfileToView(p) {
   else if (est.length && prom.length) verdict = "Supported by human evidence for some outcomes; still early or uncertain for others.";
   else verdict = "Early or limited evidence — treat claims with caution.";
   const bestTier = p.best_tier || p.tier;
-  return { name: p.name, cat: p.category, tier: p.tier, bestTier, outcomeDependent: !!p.outcome_dependent,
+  return { analysis: p.analysis || null, aliases: p.aliases || [], name: p.name, cat: p.category, tier: p.tier, bestTier, outcomeDependent: !!p.outcome_dependent,
     displayTier: p.outcome_dependent ? "Outcome-dependent" : p.tier,
     bestOutcome: p.best_outcome || null, tierColor: TIER_COLORS[bestTier] || TIER_COLORS[p.tier] || TIER_COLORS.Unknown,
     overallScore: p.overall_score, studyCount: p.study_count,
@@ -636,7 +646,7 @@ function peptideFamilyOf(name) {
   return "other";
 }
 
-function ResearchTab({ langState, initialRequest, onHome, onLearn, onProfileOpen, onResearchRoot, onMethodologyOpen }) {
+function ResearchTab({ langState, initialRequest, onHome, onLearn, onProfileOpen, onResearchRoot, onMethodologyOpen, onEvidence }) {
   const [query, setQuery] = useState("");
   const searchRef = useRef(null);
   useEffect(() => {
@@ -644,7 +654,7 @@ function ResearchTab({ langState, initialRequest, onHome, onLearn, onProfileOpen
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, []);
-  const [catFilter, setCatFilter] = useState("peptide");
+  const [catFilter, setCatFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState("all");
   const [active, setActive] = useState(null);
   const [notFound, setNotFound] = useState(null);
@@ -739,6 +749,8 @@ function ResearchTab({ langState, initialRequest, onHome, onLearn, onProfileOpen
   const submitSearch = () => {
     const q = query.trim();
     if (!q) return;
+    const evidence = findEvidence(q);
+    if (evidence && onEvidence) { onEvidence(entityPath(evidence)); return; }
     const entry = CATALOG.find((c) => c[0].toLowerCase().includes(q.toLowerCase()));
     runResearch(q, entry ? entry[1] : "supplement");
   };
@@ -973,283 +985,8 @@ function ResearchTab({ langState, initialRequest, onHome, onLearn, onProfileOpen
           </div>
         )}
 
-        {/* ===== CATALOG / BROWSE VIEW ===== */}
-        {!showProfile && !showMethod && !loading && !error && (
-          <>
-            {/* Cold-start banner — only shows if the backend is slow to wake */}
-            {showWakeMsg && warming ? (
-              <div style={{ position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 50,
-                display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderRadius: 12,
-                background: "rgba(52,224,190,0.10)", border: "1px solid rgba(52,224,190,0.35)", backdropFilter: "blur(10px)",
-                fontFamily: MONO, fontSize: 12, color: TEAL, boxShadow: "0 8px 30px rgba(0,0,0,0.4)" }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: TEAL, animation: "pulse 1.2s ease-in-out infinite" }} />
-                Warming up the research engine — first load can take a moment…
-              </div>
-            ) : null}
-            {/* Hero glow (kept, subtle) */}
-            <div aria-hidden="true" className="hero-glow" />
+        {!showProfile && !showMethod && !loading && !error && <Library initialType="intervention"/>}
 
-            <div className="app-shell">
-              {/* Mobile backdrop */}
-              <div className={`sidebar-backdrop ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
-
-              {/* ===== SIDEBAR ===== */}
-              <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
-                <div className="sidebar-brand">
-                  <div style={{ width: 26, height: 26, borderRadius: 8, background: `linear-gradient(135deg,${TEAL},#1B7A6C)`, display: "grid", placeItems: "center", flexShrink: 0 }}>
-                    <Activity size={15} color={INK} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>Clarity</div>
-                    <div style={{ fontFamily: MONO, fontSize: 9, color: MUTE, letterSpacing: 0.5 }}>{t.tagline.toUpperCase()}</div>
-                  </div>
-                </div>
-
-                {/* Language toggle */}
-                <div style={{ display: "flex", gap: 4, padding: "0 8px 14px" }}>
-                  {[["en", "EN"], ["es", "ES"]].map(([code, label]) => (
-                    <button key={code} onClick={() => langState[1](code)}
-                      style={{ flex: 1, padding: "6px 0", borderRadius: 8, cursor: "pointer", fontFamily: MONO, fontSize: 11, letterSpacing: 0.5,
-                        background: langState[0] === code ? "rgba(52,224,190,0.12)" : "rgba(255,255,255,0.03)",
-                        border: `1px solid ${langState[0] === code ? "rgba(52,224,190,0.4)" : "rgba(255,255,255,0.08)"}`,
-                        color: langState[0] === code ? TEAL : MUTE }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                <button className="nav-item" onClick={() => { setSidebarOpen(false); if (onLearn) onLearn("basics"); }} style={{ marginBottom: 8, borderColor: "rgba(52,224,190,0.16)", background: "rgba(52,224,190,0.04)" }}>
-                  <BookOpen size={14} color={TEAL} />
-                  <span>{guide.beginner_link}</span>
-                </button>
-
-                <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: 1.2, color: "#5E6E8A", padding: "0 12px 8px" }}>{t.categories}</div>
-                {/* Peptides lead — the focus of the site. */}
-                {CATS.peptide ? (
-                  <button className={`nav-item ${catFilter === "peptide" ? "active" : ""}`} onClick={() => { setCatFilter("peptide"); setSidebarOpen(false); }}>
-                    <span className="nav-dot" style={{ background: CATS.peptide.color }} />{categoryLabel("peptide", langState[0])}
-                  </button>
-                ) : null}
-                <button className={`nav-item ${catFilter === "all" ? "active" : ""}`} onClick={() => { setCatFilter("all"); setSidebarOpen(false); }}>
-                  <span className="nav-dot" style={{ background: TEAL }} />{t.all_compounds}
-                </button>
-                {Object.entries(CATS).filter(([k]) => k !== "goal" && k !== "peptide").map(([k, v]) => (
-                  <button key={k} className={`nav-item ${catFilter === k ? "active" : ""}`} onClick={() => { setCatFilter(k); setSidebarOpen(false); }}>
-                    <span className="nav-dot" style={{ background: v.color }} />{categoryLabel(k, langState[0])}
-                  </button>
-                ))}
-
-                <div style={{ marginTop: "auto", paddingTop: 16, borderTop: `1px solid rgba(255,255,255,0.07)` }}>
-                  <button className="nav-item" onClick={() => { if (onLearn) onLearn("evidence"); setSidebarOpen(false); }}>
-                    <FlaskConical size={14} color={VIOLET} />{langState[0] === "es" ? "Guía de evidencia" : "Evidence guide"}
-                  </button>
-                  <button className="nav-item" onClick={() => { setView(null); setShowMethod(true); setSidebarOpen(false); onMethodologyOpen?.(); jumpToPageTop(); }}>
-                    <span className="nav-dot" style={{ background: "transparent", border: `1.5px solid ${TEAL}` }} />{langState[0] === "es" ? "Cómo calificamos" : "How grading works"}
-                  </button>
-                </div>
-              </aside>
-
-              {/* ===== MAIN ===== */}
-              <main className="main-area">
-                <button className="hamburger" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
-
-                <div className="eyebrow" style={{ marginBottom: 10 }}>{t.eyebrow}</div>
-                <h1 className="page-title">
-                  {t.hero_1}<span style={{ color: TEAL }}>{t.hero_evidence}</span>{t.hero_2}
-                </h1>
-
-                <div className="searchbar" style={{ margin: "0 0 16px", maxWidth: 560 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 15, color: "#5E6E8A", flexShrink: 0 }}>⌕</span>
-                  <input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitSearch()}
-                    placeholder={t.search_ph}
-                    style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: TEXT, fontSize: 16, fontFamily: DISPLAY, padding: "6px 0" }} />
-                  <span className="cmdk">⌘K</span>
-                  <button onClick={submitSearch} className="ev-btn search-go" aria-label={t.research}>
-                    <Sparkles size={15} /><span className="go-label">{t.research}</span>
-                  </button>
-                </div>
-
-                {/* Utility bar: secondary filters + topic count */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 18, paddingBottom: 14, borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
-                  <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}
-                    style={{ background: PANEL2, color: tierFilter === "all" ? MUTE : tierColor(tierFilter), border: `1px solid ${LINE}`, borderRadius: 20, fontFamily: MONO, fontSize: 11.5, padding: "7px 12px", outline: "none", cursor: "pointer" }}>
-                    <option value="all">{t.evidence_all}</option>
-                    <option value={T.strong}>{tierLabel("Strong", langState[0])}</option>
-                    <option value={T.moderate}>{tierLabel("Moderate", langState[0])}</option>
-                    <option value={T.emerging}>{tierLabel("Emerging", langState[0])}</option>
-                    <option value={T.weak}>{langState[0] === "es" ? "Débil" : "Weak"}</option>
-                  </select>
-                  <span style={{ fontFamily: MONO, fontSize: 11.5, color: MUTE }}>
-                    {filtered.length} {filtered.length === 1 ? t.topic : t.topics}
-                    {catFilter !== "all" && <span style={{ color: CATS[catFilter].color }}> · {categoryLabel(catFilter, langState[0])}</span>}
-                  </span>
-                </div>
-
-                {/* Coming-soon notice */}
-                {notFound && (
-                  <div className="rise" style={{ background: `${TEAL}0C`, border: `1px solid ${TEAL}33`, borderRadius: 10, padding: "11px 14px", marginBottom: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <Sparkles size={15} color={TEAL} style={{ flexShrink: 0, marginTop: 2 }} />
-                    <div style={{ fontSize: 13, lineHeight: 1.45 }}>
-                      <b>{notFound}</b> is in the catalog — its full profile rolls out as our engine grades the studies.
-                    </div>
-                  </div>
-                )}
-
-                {/* Catalog grid */}
-                {/* Peptide landing intro — only on the peptide view */}
-                {catFilter === "peptide" ? (
-                  <div style={{ borderRadius: 16, padding: "20px 22px", marginBottom: 22, background: "linear-gradient(135deg,rgba(52,224,190,0.07),rgba(154,140,245,0.05))", border: "1px solid rgba(52,224,190,0.2)" }}>
-                    <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.4, marginBottom: 8 }}>{langState[0] === "es" ? "Péptidos, agrupados según para qué se investigan" : "Peptides, grouped by what they're explored for"}</div>
-                    <div style={{ fontSize: 13.5, lineHeight: 1.65, color: "#A9B8CE", maxWidth: 680, textWrap: "pretty" }}>
-                      {langState[0] === "es" ? "Cada uno muestra su calificación real de evidencia: desde GLP-1 con grandes ensayos en humanos hasta péptidos de investigación cuya evidencia sigue siendo principalmente animal. Empieza por el mecanismo, mira dónde está realmente la ciencia y qué falta por demostrar." : "Each one below carries its real evidence grade — from GLP-1s with large human trials to research peptides still living mostly in animal data. Lead with the mechanism, see where the science actually stands, and where it might go next."}
-                    </div>
-                  </div>
-                ) : null}
-
-                {(() => {
-                  // One card renderer, used by both the flat grid and the grouped view.
-                  const renderCard = (c, i) => {
-                    const [name, cat] = c;
-                    const cc = CATS[cat];
-                    const live = liveTier(name);
-                    const graded = !!live;
-                    const tier = live ? live.tier : null;
-                    const bestTier = live?.bestTier || tier;
-                    const outcomeDependent = !!live?.outcomeDependent;
-                    const displayTier = outcomeDependent ? (langState[0] === "es" ? "Depende del resultado" : "Outcome-dependent") : tierLabel(tier, langState[0]);
-                    const tc = graded ? tierColor(bestTier) : "#5E6E8A";
-                    const fillPct = bestTier === "Strong" ? "90%" : bestTier === "Moderate" ? "62%" : bestTier === "Emerging" ? "40%" : bestTier === "Preliminary" ? "24%" : "0%";
-                    return (
-                      <motion.div key={name + i}
-                        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: Math.min(i * 0.03, 0.6), duration: 0.35, ease: "easeOut" }}
-                        className="cat-tile tile-press" role="button" tabIndex={0} aria-label={`${langState[0] === "es" ? "Abrir evidencia para" : "Open evidence for"} ${name}`} onClick={() => runResearch(name, cat)}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); runResearch(name, cat); } }}
-                        onMouseEnter={() => prefetchProfile(name, cat)}
-                        style={{
-                          background: "rgba(255,255,255,0.025)",
-                          border: "1px solid rgba(255,255,255,0.07)",
-                          borderRadius: 14, padding: "16px 17px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 10, minHeight: 132,
-                          cursor: "pointer", transition: "border-color .22s, background .22s, transform .22s",
-                        }}
-                        whileHover={{ y: -3, borderColor: "rgba(52,224,190,0.45)", backgroundColor: "rgba(255,255,255,0.055)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                          <span style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.3 }}>{name}</span>
-                          {graded ? (
-                            <span style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 10, color: tc, flexShrink: 0 }}>
-                              <span style={{ width: 8, height: 8, borderRadius: 2, background: tc }} />{displayTier}
-                            </span>
-                          ) : (
-                            <span style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 9.5, color: "#5E6E8A", flexShrink: 0 }}>
-                              <span style={{ width: 8, height: 8, borderRadius: 2, border: "1.5px dashed #5E6E8A" }} />{langState[0] === "es" ? "Sin calificar" : "Ungraded"}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
-                          {graded ? (
-                            <div className="growbar" style={{ height: "100%", borderRadius: 3, width: fillPct, background: tc }} />
-                          ) : (
-                            <div style={{ height: "100%", borderRadius: 3, width: "100%", background: "repeating-linear-gradient(90deg,rgba(255,255,255,0.08) 0 5px,transparent 5px 10px)" }} />
-                          )}
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 9.5, color: "#5E6E8A" }}>
-                          <span>{categoryLabel(cat, langState[0])}</span>
-                          {graded ? (
-                            outcomeDependent && live.bestOutcome ? (
-                              <span title={`${live.bestOutcome} · ${live.bestTier || tier}`} style={{ color: tc, maxWidth: "64%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>
-                                {langState[0] === "es" ? "mejor: " : "best: "}{live.bestOutcome} · {tierLabel(live.bestTier || tier, langState[0])}
-                              </span>
-                            ) : (
-                              <span style={{ color: "#5E6E8A", opacity: 0.9 }}>{langState[0] === "es" ? "ver evidencia →" : "view evidence →"}</span>
-                            )
-                          ) : (
-                            <span style={{ color: "#5E6E8A", opacity: 0.8 }}>{langState[0] === "es" ? "aún sin calificar" : "not graded yet"}</span>
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  };
-
-                  // Peptide view: group into families with section headers.
-                  if (catFilter === "peptide") {
-                    let idx = 0;
-                    const byFam = {};
-                    filtered.forEach((c) => {
-                      const f = peptideFamilyOf(c[0]);
-                      (byFam[f] = byFam[f] || []).push(c);
-                    });
-                    return (
-                      <div style={{ paddingBottom: 60 }}>
-                        {PEPTIDE_FAMILIES.filter((fam) => (byFam[fam.key] || []).length).map((fam) => (
-                          <div key={fam.key} style={{ marginBottom: 30 }}>
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 15.5, fontWeight: 700, letterSpacing: -0.3 }}>{langState[0] === "es" ? (PEPTIDE_FAMILY_ES[fam.key]?.label || fam.label) : fam.label}</div>
-                              <div style={{ fontSize: 12.5, color: "#8B9AB6", lineHeight: 1.5, marginTop: 3, maxWidth: 620 }}>{langState[0] === "es" ? (PEPTIDE_FAMILY_ES[fam.key]?.blurb || fam.blurb) : fam.blurb}</div>
-                            </div>
-                            <div className="catgrid">
-                              {byFam[fam.key].map((c) => renderCard(c, idx++))}
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* BLENDS — not graded; components + honest "why" + links */}
-                        <div style={{ marginBottom: 30, marginTop: 8 }}>
-                          <div style={{ marginBottom: 6 }}>
-                            <div style={{ fontSize: 15.5, fontWeight: 700, letterSpacing: -0.3 }}>Blends</div>
-                            <div style={{ fontSize: 12.5, color: "#8B9AB6", lineHeight: 1.55, marginTop: 3, maxWidth: 660 }}>
-                              Multi-peptide combos sold as one product. We don't grade blends — no study tests the specific combination, so a grade would be inventing evidence that doesn't exist. Instead we show what's inside and link to the real evidence for each part.
-                            </div>
-                          </div>
-                          <div style={{ borderRadius: 12, padding: "14px 16px", marginBottom: 14, background: "rgba(154,140,245,0.05)", border: "1px solid rgba(154,140,245,0.2)", fontSize: 12.5, lineHeight: 1.6, color: "#A9B8CE", maxWidth: 680 }}>
-                            <b style={{ color: VIOLET }}>Why they're sold as blends:</b> the components usually target the same goal through different mechanisms, so vendors combine them for convenience (one injection) and a synergy rationale. Important: "sold together" reflects that rationale and marketing — <b>not</b> evidence that the combination works better than the parts. No trials test these specific mixes.
-                          </div>
-                          <div className="catgrid">
-                            {BLENDS.map((b) => (
-                              <div key={b.name} style={{ borderRadius: 14, padding: "16px 17px", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", flexDirection: "column", gap: 10 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                                  <span style={{ fontSize: 14.5, fontWeight: 600 }}>{b.name}</span>
-                                  <span style={{ fontFamily: MONO, fontSize: 9, color: VIOLET, border: `1px solid ${VIOLET}55`, borderRadius: 5, padding: "2px 6px", whiteSpace: "nowrap" }}>BLEND</span>
-                                </div>
-                                <div style={{ fontSize: 12.5, color: "#8B9AB6", lineHeight: 1.5 }}>{b.pitch}</div>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                  {b.components.map((comp) => (
-                                    <button key={comp} onClick={() => runResearch(comp, "peptide")}
-                                      style={{ fontFamily: MONO, fontSize: 10.5, color: TEAL, background: "rgba(52,224,190,0.08)", border: `1px solid rgba(52,224,190,0.3)`, borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}>
-                                      {comp} →
-                                    </button>
-                                  ))}
-                                </div>
-                                {b.unverified ? (
-                                  <div style={{ fontFamily: MONO, fontSize: 9, color: "#8B9AB6" }}>exact composition not independently verified by Clarity</div>
-                                ) : null}
-                                <a href={buildAffiliateUrl(b.name)} target="_blank" rel="noreferrer nofollow sponsored"
-                                  style={{ fontFamily: MONO, fontSize: 10.5, color: INK, background: TEAL, borderRadius: 7, padding: "6px 10px", textAlign: "center", textDecoration: "none", fontWeight: 700, marginTop: 2 }}>
-                                  Shop {b.name} ↗
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // All other views: flat grid.
-                  return (
-                    <div className="catgrid" style={{ paddingBottom: 60 }}>
-                      {filtered.map((c, i) => renderCard(c, i))}
-                    </div>
-                  );
-                })()}
-                {filtered.length === 0 && (
-                  <div style={{ textAlign: "center", padding: "40px 0 80px", color: MUTE, fontFamily: MONO, fontSize: 13 }}>
-                    No topics match. Try clearing filters.
-                  </div>
-                )}
-              </main>
-            </div>
-          </>
-        )}
       </div>
     </div>
     </LangContext.Provider>
@@ -2238,57 +1975,6 @@ function TextureLegend() {
 // the link), frames it as "if you've decided to try this" rather than a
 // recommendation, and discloses the commission plainly (FTC-required and
 // trust-building). The affiliate relationship never changes the grade.
-const AFFILIATE = {
-  base: "https://aminoclub.com",
-  params: "utm_source=affiliate_marketing&code=JORGE05",
-  supplier: "Amino Club",
-};
-function buildAffiliateUrl(name) {
-  // A search/deep link to the supplier with the affiliate code attached.
-  const q = encodeURIComponent(name || "");
-  return `${AFFILIATE.base}/?${AFFILIATE.params}&q=${q}`;
-}
-function WhereToBuy({ name, tier, tierColor, category }) {
-  const [lang] = React.useContext(LangContext);
-  const es = lang === "es";
-  // Only shown for peptides (the affiliate supplier's catalog). Adjust the
-  // gate if the supplier carries other categories.
-  const isPeptide = (category || "").toLowerCase() === "peptide";
-  if (!isPeptide) return null;
-  const weak = tier === "Preliminary" || tier === "Emerging";
-  return (
-    <div style={{ marginTop: 34, borderRadius: 18, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.02)", overflow: "hidden" }}>
-      <div style={{ padding: "18px 22px" }}>
-        <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTE, marginBottom: 10 }}>{es ? "DÓNDE COMPRAR" : "WHERE TO BUY"}</div>
-
-        {/* The grade travels with the link — honesty guardrail. */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 12 }}>
-          <span style={{ fontSize: 14.5, color: TEXT }}>{es ? `Calificación de Clarity para ${name}:` : `Clarity's grade for ${name}:`}</span>
-          <span style={{ padding: "3px 11px", borderRadius: 14, background: `${tierColor}22`, border: `1px solid ${tierColor}`, color: tierColor, fontSize: 12, fontWeight: 600 }}>{String(tierLabel(tier, lang)).toUpperCase()}</span>
-        </div>
-
-        {/* Honest framing — especially for weak-evidence compounds. */}
-        <div style={{ fontSize: 13.5, lineHeight: 1.65, color: "#A9B8CE", marginBottom: 16, maxWidth: 620, textWrap: "pretty" }}>
-          {weak
-            ? (es ? `La evidencia humana para ${name} es limitada (consulta la calificación de arriba). Si, sabiendo eso, decidiste probarlo, este es un proveedor con el que colaboramos; comprar mediante este enlace ayuda a mantener Clarity sin costo adicional para ti.` : `The human evidence for ${name} is limited (see the grade above). If, knowing that, you've decided to try it, this is a supplier we've partnered with — buying through this link helps support Clarity at no extra cost to you.`)
-            : (es ? `Si decidiste probar ${name}, este es un proveedor con el que colaboramos. Comprar mediante este enlace ayuda a mantener Clarity sin costo adicional para ti.` : `If you've decided to try ${name}, this is a supplier we've partnered with. Buying through this link helps support Clarity at no extra cost to you.`)}
-        </div>
-
-        <a href={buildAffiliateUrl(name)} target="_blank" rel="noreferrer nofollow sponsored"
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: TEAL, color: INK, fontWeight: 700, fontSize: 14, padding: "11px 20px", borderRadius: 11, textDecoration: "none" }}>
-          {es ? `Comprar ${name} en ${AFFILIATE.supplier}` : `Shop ${name} at ${AFFILIATE.supplier}`} ↗
-        </a>
-      </div>
-
-      {/* Disclosure — FTC-required, and it builds trust. */}
-      <div style={{ padding: "11px 22px", background: "rgba(255,255,255,0.02)", borderTop: `1px solid ${LINE}`, fontFamily: MONO, fontSize: 10, lineHeight: 1.6, color: "#5E6E8A" }}>
-        {es ? "DIVULGACIÓN DE AFILIADO: Clarity recibe una comisión si compras mediante este enlace. Esto nunca afecta cómo calificamos un compuesto; la calificación de evidencia anterior es independiente de cualquier relación comercial. No es consejo médico." : "AFFILIATE DISCLOSURE: Clarity earns a commission if you buy through this link. This never affects how we grade a compound — the evidence rating above is independent of any commercial relationship. Not medical advice."}
-      </div>
-    </div>
-  );
-}
-
-
 // Grounded evidence assistant — answers only from the graded profile.
 function AskClarity({ topic, category, compoundName, outcomes }) {
   const [lang] = React.useContext(LangContext);
@@ -2617,10 +2303,12 @@ function MethodologyPage({ onBack }) {
   ];
   return (
     <div className="rise" style={{ paddingBottom: 90, paddingTop: 8, maxWidth: 820, margin: "0 auto" }}>
+      <h1>Health evidence methodology</h1>
+      <PlatformMethodology/>
       <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 1.6, color: TEAL, marginBottom: 12 }}>{es ? "CÓMO FUNCIONAN LAS CALIFICACIONES" : "HOW GRADING WORKS"}</div>
-      <h1 style={{ margin: "0 0 16px", fontSize: 40, lineHeight: 1.05, letterSpacing: -1.6, fontWeight: 700, textWrap: "pretty" }}>{es ? "Cada calificación se remonta a estudios reales — y también a los estudios que faltan." : "Every grade traces back to real studies — and to the studies that are missing."}</h1>
+      <h2 style={{ margin: "0 0 16px", fontSize: 40, lineHeight: 1.05, letterSpacing: -1.6, fontWeight: 700, textWrap: "pretty" }}>{es ? "Cada calificación se remonta a estudios reales — y también a los estudios que faltan." : "Every grade traces back to real studies — and to the studies that are missing."}</h2>
       <p style={{ fontSize: 15.5, lineHeight: 1.7, color: "#A9B8CE", marginBottom: 20, maxWidth: 660, textWrap: "pretty" }}>
-        {es ? "Muchos sitios de suplementos te dicen lo que vende. Clarity te muestra lo que realmente indica la investigación publicada, incluyendo dónde hay muy poca evidencia. Así es como un compuesto obtiene su calificación." : "Most supplement sites tell you what sells. Clarity tells you what the published research actually shows — including, honestly, where it shows very little. Here's exactly how a compound earns its grade."}
+        {es ? "Muchos sitios de suplementos te dicen lo que vende. Clarity te muestra lo que realmente indica la investigación publicada, incluyendo dónde hay muy poca evidencia. Así es como un compuesto obtiene su calificación." : "Intervention appraisals organize the published evidence by outcome and population. These automated grades describe the available research and its limitations; they are separate from the frameworks used for biomarkers, tests, and screening."}
       </p>
       <div style={{ borderRadius:14, padding:"16px 18px", background:"rgba(95,168,245,.055)", border:"1px solid rgba(95,168,245,.20)", marginBottom:30 }}>
         <div style={{ fontFamily:MONO, fontSize:9.5, letterSpacing:1.2, color:"#75B8FF", marginBottom:7 }}>{es?"MARCO AUTOMATIZADO, INFORMADO POR GRADE":"AUTOMATED, GRADE-INFORMED FRAMEWORK"}</div>
@@ -2655,9 +2343,9 @@ function MethodologyPage({ onBack }) {
       </div>
 
       <div style={{ borderRadius: 14, padding: "20px 22px", background: "rgba(154,140,245,0.06)", border: "1px solid rgba(154,140,245,0.22)", marginBottom: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 650, marginBottom: 8, color: VIOLET }}>{es ? "Por qué tantos péptidos son Emergentes o Preliminares" : "Why so many peptides are Emerging or Preliminary"}</div>
+        <div style={{ fontSize: 15, fontWeight: 650, marginBottom: 8, color: VIOLET }}>{es ? "Por qué tantos péptidos son Emergentes o Preliminares" : "Why early evidence needs a separate layer"}</div>
         <div style={{ fontSize: 13.5, lineHeight: 1.7, color: "#A9B8CE", textWrap: "pretty" }}>
-          {es ? "Muchos péptidos muestran resultados llamativos en animales, pero todavía tienen pocos o ningún ensayo humano adecuado. Una calificación baja no significa 'no funciona'; significa 'todavía no se ha demostrado que funcione en personas'." : "Many peptides have striking results in animals but few or no proper human trials yet. That's not us being harsh — it's the honest state of the research. A low tier doesn't mean 'doesn't work'; it means 'not yet shown to work in people.' We think you deserve to know which is which before you decide anything."}
+          {es ? "Muchos péptidos muestran resultados llamativos en animales, pero todavía tienen pocos o ningún ensayo humano adecuado. Una calificación baja no significa 'no funciona'; significa 'todavía no se ha demostrado que funcione en personas'." : "An intervention may have biological or animal evidence while clinical benefit remains uncertain. Evidence strength depends on the population, outcome, study design, and limitations. A low tier is not proof of no effect."}
         </div>
       </div>
 
@@ -2668,167 +2356,16 @@ function MethodologyPage({ onBack }) {
   );
 }
 
-function ProfileView({ view, source, onBack, onLearn }) {
-  if (!view) return null;
-  const [lang] = React.useContext(LangContext);
-  const t = STRINGS[lang] || STRINGS.en;
-  const es = lang === "es";
-  const ex = (lang === "es" && view.explanation_es) ? view.explanation_es : (view.explanation || null);
-  const appraisalPick = (lang === "es" && view.appraisal_es) ? view.appraisal_es : view.appraisal;
-  const figMode = useState("stack");
-  const hoverState = useState(null);
-  const [guided, setGuided] = useState(false);
-  const proven = view.outcomes.filter((o) => o.tier === "Strong" || o.tier === "Moderate");
-  const promising = view.outcomes.filter((o) => o.tier === "Emerging" || o.tier === "Preliminary");
-  const humanRun = Number.isFinite(view.uniqueHumanStudyCount) ? view.uniqueHumanStudyCount : view.outcomes.reduce((n, o) => n + (o.layers?.nHuman || 0), 0);
-  const verdictLead = es
-    ? (view.established?.length && !view.promising?.length ? "Respaldado por evidencia humana en sus principales resultados."
-      : view.promising?.length && !view.established?.length ? "Prometedor en mecanismos o estudios animales, pero aún no demostrado en humanos."
-      : view.established?.length && view.promising?.length ? "Respaldado por evidencia humana para algunos resultados; todavía temprano o incierto para otros."
-      : "Evidencia temprana o limitada; interpreta las afirmaciones con cautela.")
-    : view.verdict;
-  const updatedLabel = view.generatedAt ? new Date(view.generatedAt).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { year:"numeric", month:"short", day:"numeric" }) : null;
-  const sourceLabel = (view.sources || []).map((x) => String(x).replace("europe_pmc","Europe PMC").replace("pubmed","PubMed")).join(" + ") || "PubMed + Europe PMC";
-  const badgeText = view.outcomeDependent ? (es ? "DEPENDE DEL RESULTADO" : "OUTCOME-DEPENDENT") : String(tierLabel(view.bestTier || view.tier, lang)).toUpperCase();
-  const snapshotFacts = [
-    { label: es ? "estudios únicos calificados" : "unique studies graded", value: view.studyCount, accent: TEXT },
-    { label: t.outcomes_graded, value: view.outcomes.length, accent: TEXT },
-    { label: t.run_in_people, value: humanRun, accent: TEAL },
-  ];
-  return (
-    <div className="rise" style={{ paddingBottom: 90, paddingTop: 8 }}>
-      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:16 }}>
-        <motion.button whileHover={{ y:-1 }} whileTap={{ scale:.98 }} transition={MOTION_SPRING} onClick={() => setGuided((v)=>!v)} style={{ display:"inline-flex",alignItems:"center",gap:8,border:`1px solid ${guided ? TEAL : LINE}`,background:guided?`${TEAL}12`:PANEL2,color:guided?TEAL:MUTE,borderRadius:20,padding:"8px 13px",cursor:"pointer",fontFamily:MONO,fontSize:10.5 }}>
-          <BookOpen size={14}/>{es ? (guided ? "Ocultar ayuda" : "Ayúdame a entender esta página") : (guided ? "Hide guide" : "Help me understand this page")}
-        </motion.button>
-      </div>
-
-      {/* HEADER — simple scientific overview. Keep the first screen readable. */}
-      <div style={{ display:"flex", flexWrap:"wrap", gap:36, alignItems:"flex-end", padding:"2px 0 28px" }}>
-        <div style={{ flex:"1 1 520px", minWidth:300 }}>
-          <div style={{ fontFamily:MONO, fontSize:11, letterSpacing:1.6, color:TEAL, marginBottom:13, textTransform:"uppercase" }}>{categoryLabel(view.cat, lang)}</div>
-          <h1 style={{ margin:"0 0 16px", fontSize:50, lineHeight:1.0, letterSpacing:-2.3, fontWeight:700, textTransform:"capitalize", textWrap:"pretty" }}>{view.name}</h1>
-          <p style={{ margin:"0 0 18px", maxWidth:660, fontSize:15.5, lineHeight:1.68, color:"#A9B8CE", textWrap:"pretty" }}>
-            {verdictLead} {es ? "Cuando no existe un número, mostramos el vacío en lugar de rellenarlo con una afirmación de marketing." : "Where a number doesn't exist, you'll see the hole where it should be — not a marketing claim."}
-          </p>
-
-          {view.chemistry && view.chemistry.formula ? (
-            <a href={view.chemistry.pubchem_url || "#chemistry"} target={view.chemistry.pubchem_url?"_blank":undefined} rel={view.chemistry.pubchem_url?"noreferrer":undefined} style={{ display:"inline-flex", maxWidth:"100%", flexWrap:"wrap", gap:10, alignItems:"center", marginBottom:20, padding:"6px 0", color:"inherit", textDecoration:"none" }}>
-              {view.chemistry.image_url ? <div style={{width:42,height:42,borderRadius:9,background:"rgba(255,255,255,.94)",display:"grid",placeItems:"center",overflow:"hidden",flexShrink:0}}><img src={view.chemistry.image_url} alt="" style={{width:38,height:38,objectFit:"contain"}}/></div> : <div style={{width:34,height:34,borderRadius:9,display:"grid",placeItems:"center",background:`${TEAL}09`}}><FlaskConical size={16} color={TEAL}/></div>}
-              <div style={{minWidth:0}}><div style={{fontSize:11.5,fontWeight:650,color:"#C9D5E4"}}>{es?"Identidad molecular":"Molecular identity"}</div><div style={{display:"flex",flexWrap:"wrap",gap:7,alignItems:"baseline",marginTop:3,fontFamily:MONO,fontSize:9.8,color:"#7F91AA"}}><span style={{color:TEAL}}>{view.chemistry.formula}</span>{view.chemistry.weight?<><span>·</span><span>{view.chemistry.weight} g/mol</span></>:null}{view.chemistry.cid?<><span>·</span><span>PubChem {view.chemistry.cid}</span></>:null}<span style={{color:"#78BDF8"}}>↗</span></div></div>
-            </a>
-          ) : null}
-
-          <div style={{ display:"flex", flexWrap:"wrap", gap:24, alignItems:"baseline" }}>
-            <div><span style={{ fontFamily:MONO, fontSize:26, fontWeight:650, color:TEXT }}>{view.studyCount}</span><span style={{ fontSize:12, color:MUTE }}> {es?"estudios únicos calificados":"unique studies graded"}</span></div>
-            <div><span style={{ fontFamily:MONO, fontSize:26, fontWeight:650, color:TEXT }}>{view.outcomes.length}</span><span style={{ fontSize:12, color:MUTE }}> {t.outcomes_graded}</span></div>
-            <div><span style={{ fontFamily:MONO, fontSize:26, fontWeight:650, color:TEAL }}>{humanRun}</span><span style={{ fontSize:12, color:MUTE }}> {t.run_in_people}</span></div>
-          </div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center", marginTop:14, fontSize:10.5, color:"#667893" }}>
-            <span>{sourceLabel}</span>{updatedLabel ? <><span style={{opacity:.45}}>·</span><span>{es?"actualizado":"updated"} {updatedLabel}</span></> : null}{view.engineVersion ? <><span style={{opacity:.45}}>·</span><span>engine {view.engineVersion}</span></> : null}
-          </div>
-        </div>
-
-        <div style={{ flex:"0 0 250px", alignSelf:"stretch", display:"flex", flexDirection:"column", justifyContent:"flex-end" }}>
-          <div style={{ padding:"16px 0 14px 18px", borderLeft:`2px solid ${view.tierColor}`, borderTop:"1px solid rgba(255,255,255,.06)", borderBottom:"1px solid rgba(255,255,255,.06)" }}>
-            <div style={{fontSize:10.5,fontWeight:650,color:MUTE,marginBottom:7}}>{es?"Clasificación de evidencia":"Evidence classification"}</div>
-            <div style={{fontSize:view.outcomeDependent?15:26,fontWeight:720,letterSpacing:-.4,color:view.tierColor,lineHeight:1.08}}>{badgeText}</div>
-            <div style={{fontSize:10.5,color:"#7F91AA",lineHeight:1.45,marginTop:8}}>{view.outcomeDependent ? (es?`Mejor resultado humano: ${view.bestOutcome || "—"} · ${tierLabel(view.bestTier||view.tier,lang)}`:`Best-supported human outcome: ${view.bestOutcome || "—"} · ${view.bestTier||view.tier}`) : (es?"Nivel humano más fuerte entre los resultados identificados":"Strongest human-supported tier among identified outcomes")}</div>
-            {view.weighted ? <div style={{display:"flex",alignItems:"baseline",gap:6,marginTop:11}}><span style={{fontFamily:MONO,fontSize:15,color:TEXT,fontWeight:650}}>{view.weighted.score}</span><span style={{fontSize:10,color:MUTE}}>/100 {es?"fuerza de evidencia":"evidence strength"}</span></div> : null}
-          </div>
-        </div>
-      </div>
-
-
-      <AnimatePresence initial={false}>
-      {guided ? (
-        <motion.div key="reading-guide" initial={{ opacity:0, height:0, y:-8 }} animate={{ opacity:1, height:"auto", y:0 }} exit={{ opacity:0, height:0, y:-6 }} transition={{ duration:.38, ease:MOTION_EASE }} style={{ margin:"0 0 22px", padding:"20px", borderRadius:17, border:`1px solid ${TEAL}45`, background:"linear-gradient(135deg,rgba(52,224,190,.07),rgba(154,140,245,.035))", overflow:"hidden" }}>
-          <div style={{ display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start",flexWrap:"wrap",marginBottom:15 }}>
-            <div><div style={{ fontFamily:MONO,fontSize:9.5,letterSpacing:1.4,color:TEAL,marginBottom:5 }}>{es ? "GUÍA DE LECTURA" : "READING GUIDE"}</div><div style={{ fontSize:18,fontWeight:700 }}>{es ? "Qué significan estos números" : "What these numbers mean"}</div></div>
-            {onLearn ? <button onClick={()=>onLearn("evidence")} style={{ border:"none",background:"transparent",color:TEAL,cursor:"pointer",fontFamily:MONO,fontSize:10 }}>{es ? "Guía completa de evidencia" : "Full evidence guide"} →</button> : null}
-          </div>
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10 }}>
-            <div style={{ padding:15,borderRadius:12,background:"rgba(255,255,255,.025)",border:`1px solid ${LINE}` }}><div style={{ fontFamily:MONO,fontSize:9.5,color:VIOLET,marginBottom:7 }}>{es ? "ESTUDIOS" : "STUDIES"}</div><div style={{ fontSize:13,lineHeight:1.58,color:"#B8C6D8" }}>{es ? `${view.studyCount} estudios únicos están vinculados a los resultados mostrados; ${humanRun} son estudios humanos únicos. Un mismo estudio puede contribuir a más de un resultado sin contarse dos veces aquí.` : `${view.studyCount} unique studies are tied to the outcomes shown; ${humanRun} are unique human studies. The same paper can inform more than one outcome without being counted twice here.`}</div></div>
-            <div style={{ padding:15,borderRadius:12,background:"rgba(255,255,255,.025)",border:`1px solid ${LINE}` }}><div style={{ fontFamily:MONO,fontSize:9.5,color:view.tierColor,marginBottom:7 }}>{es ? "NIVEL Y PUNTUACIÓN" : "TIER & SCORE"}</div><div style={{ fontSize:13,lineHeight:1.58,color:"#B8C6D8" }}>{es ? `El titular refleja el resultado humano mejor respaldado${view.outcomeDependent ? "; otros resultados tienen niveles distintos" : ""}. ${view.weighted ? `La puntuación ${view.weighted.score}/100 mide fuerza de evidencia; no es la probabilidad de que funcione.` : "Cuando no hay puntuación ponderada, no inventamos una."}` : `The headline reflects the best-supported human outcome${view.outcomeDependent ? "; other outcomes have different tiers" : ""}. ${view.weighted ? `The ${view.weighted.score}/100 score measures evidence strength; it is not the probability that it works.` : "When a weighted score is unavailable, we do not invent one."}`}</div></div>
-            <div style={{ padding:15,borderRadius:12,background:"rgba(255,255,255,.025)",border:`1px solid ${LINE}` }}><div style={{ fontFamily:MONO,fontSize:9.5,color:TEAL,marginBottom:7 }}>{es ? "CAPAS" : "LAYERS"}</div><div style={{ fontSize:13,lineHeight:1.58,color:"#B8C6D8" }}>{es ? "Mecanismo y datos animales pueden hacer que una señal sea científicamente interesante. Para afirmar un beneficio en personas, la evidencia debe sostenerse también en humanos. Por eso mostramos las tres capas por separado." : "Mechanistic and animal data can make a signal scientifically interesting. To support a claim about benefit in people, the evidence also has to hold up in humans. That is why the three layers stay separate."}</div></div>
-          </div>
-        </motion.div>
-      ) : null}
-      </AnimatePresence>
-
-      {/* TEXTURE LEGend — how certain is certain */}
-      {view.thinEvidence ? (
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "14px 18px", borderRadius: 12, marginBottom: 18,
-          background: "rgba(245,181,68,0.08)", border: "1px solid rgba(245,181,68,0.35)" }}>
-          <AlertTriangle size={17} color={AMBER} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "#E8D9B8" }}>
-            {view.thinEvidenceNote || (es ? "Muy pocos estudios pasaron nuestro filtro de calidad para este compuesto; trata la calificación como una señal temprana, no como evidencia establecida." : "Very few studies passed our quality screen for this compound — treat the grade as an early signal, not settled evidence.")}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Explain the compound before asking the reader to interpret grading graphics. */}
-      <ExplainerSection ex={ex} view={view} />
-
-      <TextureLegend />
-
-      <SectionHeading index="01" title={es?"Evidencia de un vistazo":"Evidence at a glance"} subtitle={es?"Primero el patrón general: qué resultados están mejor respaldados y dónde la evidencia sigue siendo temprana.":"Start with the pattern: which outcomes are best supported and where the evidence is still early."}/>
-      <EvidenceMap outcomes={view.outcomes} ex={ex} />
-
-      <SectionHeading index="02" title={es?"Pregunta a Clarity":"Ask Clarity"} subtitle={es?"Haz una pregunta específica y Clarity buscará únicamente dentro de los estudios y datos calificados de este compuesto.":"Ask a specific question and Clarity will search only within this compound's graded studies and evidence data."}/>
-      <AskClarity topic={view.name} category={view.cat} compoundName={view.name} outcomes={view.outcomes} />
-
-      {ex && ex.evidence_base ? (
-        <div style={{ marginBottom: 30 }}>
-          <div style={{ color:"#C9D5E4", fontSize:14, fontWeight:650, marginBottom:8 }}>{es ? "La investigación que lo respalda" : "The research behind it"}</div>
-          <div style={{ color: "#C6D2E2", fontSize: 15, lineHeight: 1.8, letterSpacing: 0.01 }}>{ex.evidence_base}</div>
-        </div>
-      ) : null}
-
-      <SectionHeading index="03" title={es?"Evidencia detallada por resultado":"Detailed evidence by outcome"} subtitle={es?"Aquí aparecen las capas de evidencia, estimaciones de efecto, limitaciones y estudios individuales detrás de cada resultado.":"Inspect evidence layers, effect estimates, limitations, and the individual studies behind each outcome."}/>
-      <FigureModeContext.Provider value={figMode}>
-      <HoverContext.Provider value={hoverState}>
-      <div style={{ marginBottom: 22 }}>
-        <FigureSwitcher />
-
-        {/* Layer legend */}
-        <div style={{ fontSize: 12.5, color: "#8B9AB6", lineHeight: 1.5, marginBottom: 10, maxWidth: 640 }}>
-          {es ? <>Cada barra muestra cuánta <em>fuerza de evidencia</em> (0–100) existe en cada etapa de investigación. Para alcanzar una calificación alta, la evidencia debe sostenerse en personas; una barra alta en células o animales con una barra humana baja significa que el efecto aún no se ha demostrado en humanos.</> : <>Each bar shows how much <em>evidence strength</em> (0–100) exists at each research stage. Evidence has to hold up in people to reach a high grade — a tall test-tube or animal bar with a short human bar means the effect hasn't been proven in humans yet.</>}
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", marginBottom: 22, fontFamily: MONO, fontSize: 11.5, color: MUTE }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: "#6FA8F2" }} />{es ? "TUBO DE ENSAYO — células y química" : "TEST TUBE — cells and chemistry"}</span>
-          <span style={{ color: "#3D4B63" }}>→</span>
-          <span style={{ display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: VIOLET }} />{es ? "ANIMAL — ratones y ratas" : "ANIMAL — mice and rats"}</span>
-          <span style={{ color: "#3D4B63" }}>→</span>
-          <span style={{ display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: TEAL }} />{es ? "HUMANO — personas, idealmente muchas" : "HUMAN — people, ideally many"}</span>
-        </div>
-
-        {proven.map((o) => <OutcomeGraphicCard key={o.outcome} o={o} detail={findDetail(ex, o.outcome)} />)}
-        {promising.map((o) => <OutcomeGraphicCard key={o.outcome} o={o} detail={findDetail(ex, o.outcome)} />)}
-      </div>
-      </HoverContext.Provider>
-      </FigureModeContext.Provider>
-
-      {(view.chemistry || view.pharmacokinetics) ? <SectionHeading index="04" title={es?"Identidad química y farmacocinética":"Chemistry & pharmacokinetics"} subtitle={es?"Datos técnicos verificados y, cuando existen, parámetros farmacocinéticos con fuente. Esta sección describe el compuesto; no demuestra eficacia.":"Verified technical identity and, when available, sourced pharmacokinetic parameters. This section describes the compound; it does not establish efficacy."}/> : null}
-      <ChemistryBlock chem={view.chemistry} meaning={ex && ex.chem_meaning} />
-      <PharmacokineticsBlock pk={view.pharmacokinetics} />
-
-      {ex && ex.open_questions ? (
-        <div style={{ borderTop:`1px solid rgba(154,140,245,.20)`, padding:"16px 0 6px", marginBottom:14 }}>
-          <div style={{ color: VIOLET, fontSize:14, fontWeight:650, marginBottom:7 }}>{es ? "Lo que todavía no sabemos" : "What we still don't know"}</div>
-          <div style={{ color: "#C6D2E2", fontSize: 13.5, lineHeight: 1.7 }}>{ex.open_questions}</div>
-        </div>
-      ) : null}
-
-      <AppraisalSection ap={appraisalPick} />
-
-      <WhereToBuy name={view.name} tier={view.tier} tierColor={view.tierColor} category={view.cat} />
-
-      <div style={{ borderTop: `0.5px solid ${LINE}`, paddingTop: 14, marginTop: 34, color: "#5A6B87", fontSize: 11, textAlign: "center", lineHeight: 1.6 }}>
-        {ex ? (es ? "Explicación generada por IA a partir de la evidencia calificada · " : "Explanation AI-generated from the graded evidence · ") : ""}{es ? "calificaciones y gráficos basados en evidencia de PubMed + Europe PMC · investigación y educación, no consejo médico" : "grades & charts from PubMed + Europe PMC evidence · research & education, not medical advice"}
-      </div>
-    </div>
-  );
+function ProfileView({view,onLearn}) {
+  if(!view)return null;
+  return <div className="profile-workspace" style={{paddingBottom:70}}>
+    <ProfileBrief model={compoundBrief(view)}/>
+    <section className="molecular-context" id="molecular-context"><p className="hp-eyebrow">BIOLOGY & DISPOSITION</p><h2>Molecular identity and pharmacokinetics</h2><p className="analysis-note">Structure, absorption, and exposure help explain the research question. They do not establish a clinical benefit. Values below retain their available source context.</p>
+      <ChemistryBlock chem={view.chemistry}/><PharmacokineticsBlock pk={view.pharmacokinetics}/>
+      {!view.chemistry&&!view.pharmacokinetics&&<p className="analysis-note">No sourced molecular or pharmacokinetic record has been curated for this profile.</p>}
+    </section>
+    <section id="ask-evidence"><h2>Ask a question about these studies</h2><p className="analysis-note">Answers use the graded profile and retrieved study records. Inspect the cited evidence, especially where quantitative extraction is incomplete.</p><AskClarity topic={view.name} category={view.cat} compoundName={view.name} outcomes={view.outcomes}/></section>
+  </div>;
 }
 
 // Expandable study card
@@ -2852,10 +2389,11 @@ function TopNavLinks({ active, onHome, onResearch, onLearn, lang="en" }) {
   const es=lang==="es";
   const items=[
     ["home",es?"Inicio":"Home",onHome],
-    ["research",es?"Investigar":"Research",onResearch],
+    ["research",es?"Intervenciones":"Interventions",onResearch],
     ["learn",es?"Aprender":"Learn",onLearn],
   ];
   return <nav className="desktop-top-nav" aria-label={es?"Navegación principal":"Primary navigation"} style={{display:"flex",alignItems:"center",gap:4}}>
+    <a href="/explore" style={{color:MUTE,fontSize:11.5,padding:"7px 10px",textDecoration:"none"}}>{es?"Explorar":"Explore"}</a>
     {items.map(([k,label,fn])=><button key={k} onClick={()=>fn?.()} aria-current={active===k?"page":undefined} style={{border:0,background:"transparent",cursor:"pointer",padding:"7px 10px",borderRadius:8,color:active===k?TEAL:MUTE,fontSize:11.5,fontWeight:active===k?650:500,borderBottom:`1px solid ${active===k?TEAL:"transparent"}`}}>{label}</button>)}
   </nav>;
 }
@@ -2940,96 +2478,8 @@ function GoalExploreCard({ goal, copy, onResearch, reduceMotion, gradeVersion })
   );
 }
 
-function HomePage({ langState, onResearch, onLearn, onHome }) {
-  const c = guideCopy(langState[0]);
-  const reduceMotion = useReducedMotion();
-  const [q, setQ] = useState("");
-  const [homeGradeVersion, setHomeGradeVersion] = useState(0);
-  const inputRef = useRef(null);
-  useEffect(() => {
-    let alive = true;
-    apiFetchCatalog().then((n) => { if (alive && n > 0) setHomeGradeVersion((v) => v + 1); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  const submit = () => {
-    const topic = q.trim();
-    if (!topic) { inputRef.current?.focus(); return; }
-    const match = CATALOG.find((x) => x[0].toLowerCase() === topic.toLowerCase()) || CATALOG.find((x) => x[0].toLowerCase().includes(topic.toLowerCase()));
-    onResearch(topic, match ? match[1] : "supplement");
-  };
-  const goals = [
-    { title:c.goal_recovery, sub:c.goal_recovery_sub, icon:Dumbbell, color:TEAL, examples:[["Creatine Monohydrate","supplement"],["Beta-Alanine","supplement"],["Whey Protein","supplement"],["Collagen","supplement"],["BPC-157","peptide"],["TB-500","peptide"]] },
-    { title:c.goal_sleep, sub:c.goal_sleep_sub, icon:Moon, color:VIOLET, examples:[["Melatonin","supplement"],["Ashwagandha","herb"],["Magnesium","mineral"],["L-Theanine","nootropic"],["Glycine","amino"],["Valerian Root","herb"]] },
-    { title:c.goal_cognitive, sub:c.goal_cognitive_sub, icon:Brain, color:"#5FA8F5", examples:[["Caffeine","supplement"],["L-Theanine","nootropic"],["Bacopa Monnieri","nootropic"],["Citicoline (CDP-Choline)","nootropic"],["Rhodiola Rosea","nootropic"],["Lion's Mane","nootropic"]] },
-    { title:c.goal_metabolic, sub:c.goal_metabolic_sub, icon:Activity, color:AMBER, examples:[["Semaglutide","peptide"],["Tirzepatide","peptide"],["Berberine","herb"],["Psyllium Fiber","gut"],["Apple Cider Vinegar","supplement"],["Chromium","mineral"]] },
-    { title:c.goal_longevity, sub:c.goal_longevity_sub, icon:Clock, color:"#5FD6D0", examples:[["NMN","longevity"],["NR (Nicotinamide Riboside)","longevity"],["Urolithin A","longevity"],["Spermidine","longevity"],["Fisetin","longevity"],["Rapamycin","longevity"]] },
-    { title:c.goal_skin, sub:c.goal_skin_sub, icon:Heart, color:"#F28FB4", examples:[["GHK-Cu","peptide"],["Collagen","supplement"],["Vitamin C","vitamin"],["BPC-157","peptide"],["KPV","peptide"],["AHK-Cu","peptide"]] },
-  ];
-  return (
-    <div style={{ minHeight:"100vh", background:INK, color:TEXT, fontFamily:DISPLAY }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap'); *{box-sizing:border-box}.guide-search-shell{transition:border-color .28s ease,box-shadow .28s ease,background .28s ease,transform .28s cubic-bezier(.22,1,.36,1)}.guide-search-shell:focus-within{border-color:rgba(52,224,190,.55)!important;box-shadow:0 0 0 1px rgba(52,224,190,.16),0 20px 65px rgba(52,224,190,.10)!important;background:rgba(255,255,255,.062)!important}.motion-link{transition:color .2s ease,transform .2s ease}.motion-link:hover{color:${TEAL}!important;transform:translateX(2px)}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.guide-search-shell{transition:none}} @media(max-width:980px) and (min-width:721px){.guide-goals{grid-template-columns:repeat(2,1fr)!important}}@media(max-width:720px){.guide-hero-title{font-size:42px!important}.guide-routes{grid-template-columns:1fr!important}.guide-goals{grid-template-columns:1fr!important}.guide-evidence{grid-template-columns:1fr!important}.guide-compare{grid-template-columns:1fr!important}.guide-tagline{display:none}}`}</style>
-      <GuideTopBar langState={langState} onResearch={onResearch} onHome={onHome} onLearn={onLearn} active="home"/>
-      <motion.div aria-hidden="true" animate={reduceMotion ? undefined : { x:[-14,14,-14], scale:[1,1.045,1], opacity:[.72,1,.72] }} transition={reduceMotion ? undefined : { duration:14, repeat:Infinity, ease:"easeInOut" }} style={{ position:"fixed", top:-220, left:"50%", marginLeft:-500, width:1000, height:500, background:"radial-gradient(ellipse,rgba(52,224,190,.12),rgba(52,224,190,0) 68%)", filter:"blur(34px)", pointerEvents:"none" }}/>
-      <main style={{ maxWidth:1120, margin:"0 auto", padding:"0 22px 110px", position:"relative" }}>
-        <motion.section initial={reduceMotion ? false : "hidden"} animate="show" variants={{ hidden:{}, show:{ transition:{ staggerChildren:.085, delayChildren:.05 } } }} style={{ textAlign:"center", padding:"86px 0 48px" }}>
-          <motion.div variants={{ hidden:{opacity:0,y:12}, show:{opacity:1,y:0,transition:{duration:.48,ease:MOTION_EASE}} }} style={{ fontFamily:MONO, fontSize:10.5, letterSpacing:1.8, color:TEAL, marginBottom:18 }}>{c.home_eyebrow}</motion.div>
-          <motion.h1 variants={{ hidden:{opacity:0,y:18,filter:"blur(5px)"}, show:{opacity:1,y:0,filter:"blur(0px)",transition:{duration:.62,ease:MOTION_EASE}} }} className="guide-hero-title" style={{ margin:"0 auto", maxWidth:820, fontSize:62, lineHeight:.98, letterSpacing:-2.8, fontWeight:800 }}>{c.home_title_1}<span style={{ color:TEAL }}>{c.home_title_2}</span></motion.h1>
-          <motion.p variants={{ hidden:{opacity:0,y:14}, show:{opacity:1,y:0,transition:{duration:.5,ease:MOTION_EASE}} }} style={{ maxWidth:700, margin:"24px auto 30px", color:"#A9B8CE", fontSize:16, lineHeight:1.65 }}>{c.home_sub}</motion.p>
-          <div style={{ maxWidth:680, margin:"0 auto" }}>
-            <div style={{ textAlign:"left", fontFamily:MONO, color:MUTE, fontSize:9.5, letterSpacing:1.3, margin:"0 0 7px 6px" }}>{c.search_label}</div>
-            <motion.div variants={{ hidden:{opacity:0,y:14,scale:.985}, show:{opacity:1,y:0,scale:1,transition:{duration:.5,ease:MOTION_EASE}} }} className="guide-search-shell" whileHover={reduceMotion ? undefined : { scale:1.004 }} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 11px 10px 15px", borderRadius:15, background:"rgba(255,255,255,.05)", border:"1px solid rgba(255,255,255,.13)", boxShadow:"0 18px 60px rgba(0,0,0,.2)" }}>
-              <Search size={18} color={MUTE}/><input ref={inputRef} value={q} onChange={(e)=>setQ(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&submit()} placeholder={c.search_placeholder} style={{ flex:1,minWidth:0,border:"none",outline:"none",background:"transparent",color:TEXT,fontFamily:DISPLAY,fontSize:15.5,padding:"6px 0" }}/>
-              <motion.button whileHover={reduceMotion ? undefined : { y:-1, scale:1.02 }} whileTap={reduceMotion ? undefined : { scale:.97 }} transition={MOTION_SPRING} onClick={submit} style={{ display:"flex",alignItems:"center",gap:7,border:"none",background:TEAL,color:INK,fontWeight:750,borderRadius:9,padding:"10px 15px",cursor:"pointer" }}><motion.span animate={reduceMotion ? undefined : { rotate:[0,6,0] }} transition={reduceMotion ? undefined : { duration:2.8, repeat:Infinity, repeatDelay:2.5 }} style={{ display:"grid" }}><Sparkles size={15}/></motion.span>{c.search_button}</motion.button>
-            </motion.div>
-          </div>
-        </motion.section>
-
-        <Reveal style={{ marginTop:22 }}>
-        <section>
-          <div style={{ marginBottom:18 }}><h2 style={{ margin:0,fontSize:27,letterSpacing:-.8 }}>{c.new_here}</h2><p style={{ margin:"7px 0 0",color:MUTE,fontSize:14,lineHeight:1.6,maxWidth:720 }}>{c.new_here_sub}</p></div>
-          <div className="guide-routes" style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12 }}>
-            <GuideRouteCard icon={BookOpen} title={c.route_basics} body={c.route_basics_sub} cta={c.route_basics_cta} color={TEAL} onClick={()=>onLearn("basics")}/>
-            <GuideRouteCard icon={Search} title={c.route_compound} body={c.route_compound_sub} cta={c.route_compound_cta} color="#5FA8F5" onClick={()=>inputRef.current?.focus()}/>
-            <GuideRouteCard icon={Sparkles} title={c.route_goal} body={c.route_goal_sub} cta={c.route_goal_cta} color={VIOLET} onClick={()=>document.getElementById("explore-goals")?.scrollIntoView({behavior:"smooth"})}/>
-            <GuideRouteCard icon={FlaskConical} title={c.route_evidence} body={c.route_evidence_sub} cta={c.route_evidence_cta} color={AMBER} onClick={()=>onLearn("evidence")}/>
-          </div>
-          <motion.button className="motion-link" whileTap={{ scale:.98 }} onClick={()=>onResearch(null,null)} style={{ display:"block",margin:"20px auto 0",border:"none",background:"transparent",color:MUTE,cursor:"pointer",fontFamily:MONO,fontSize:11 }}>{c.browse_all} →</motion.button>
-        </section>
-        </Reveal>
-
-        <Reveal>
-        <section id="explore-goals" style={{ paddingTop:86 }}>
-          <div style={{ fontFamily:MONO,fontSize:10,letterSpacing:1.6,color:VIOLET,marginBottom:9 }}>{c.goals_eyebrow}</div>
-          <h2 style={{ margin:0,fontSize:32,letterSpacing:-1 }}>{c.goals_title}</h2><p style={{ color:MUTE,maxWidth:760,lineHeight:1.65,fontSize:14 }}>{c.goals_sub}</p>
-          <div className="guide-goals" style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginTop:22 }}>
-            {goals.map((g,i)=><motion.div key={g.title} initial={reduceMotion ? false : {opacity:0,y:14}} whileInView={{opacity:1,y:0}} viewport={{once:true,amount:.2}} transition={reduceMotion ? {duration:0} : {duration:.46,delay:i*.055,ease:MOTION_EASE}}><GoalExploreCard goal={g} copy={c} onResearch={onResearch} reduceMotion={reduceMotion} gradeVersion={homeGradeVersion}/></motion.div>)}
-          </div>
-        </section>
-        </Reveal>
-
-        <Reveal>
-        <section style={{ paddingTop:86 }}>
-          <div style={{ fontFamily:MONO,fontSize:10,letterSpacing:1.6,color:TEAL,marginBottom:9 }}>{c.evidence_eyebrow}</div><h2 style={{ margin:0,fontSize:32,letterSpacing:-1 }}>{c.evidence_title}</h2><p style={{ color:MUTE,maxWidth:800,lineHeight:1.65,fontSize:14 }}>{c.evidence_sub}</p>
-          <div className="guide-evidence" style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginTop:22 }}>
-            {[[Beaker,c.mech,c.mech_sub,"#5FA8F5"],[Activity,c.animal,c.animal_sub,VIOLET],[Users,c.human,c.human_sub,TEAL]].map(([Ic,title,sub,color],i)=><motion.div key={title} initial={reduceMotion ? false : {opacity:0,y:16,scale:.985}} whileInView={{opacity:1,y:0,scale:1}} viewport={{once:true,amount:.25}} transition={reduceMotion ? {duration:0} : {duration:.5,delay:i*.09,ease:MOTION_EASE}} whileHover={reduceMotion ? undefined : {y:-5,scale:1.008}} style={{ padding:"22px 20px",borderRadius:16,border:`1px solid ${color}38`,background:`linear-gradient(180deg,${color}0B,rgba(255,255,255,.012))` }}><motion.div initial={reduceMotion ? false : {opacity:.4}} whileInView={{opacity:1}} transition={{delay:.15+i*.09}} style={{ fontFamily:MONO,fontSize:9.5,color,letterSpacing:1.2,marginBottom:12 }}>0{i+1}</motion.div><motion.div whileHover={reduceMotion ? undefined : {scale:1.08,rotate:-3}} style={{display:"inline-grid"}}><Ic size={20} color={color}/></motion.div><div style={{ fontSize:18,fontWeight:700,marginTop:13 }}>{title}</div><div style={{ color:"#A9B8CE",fontSize:13,lineHeight:1.58,marginTop:7 }}>{sub}</div></motion.div>)}
-          </div>
-          <motion.button className="motion-link" whileTap={{scale:.98}} onClick={()=>onLearn("evidence")} style={{ marginTop:18,border:"none",background:"transparent",color:TEAL,cursor:"pointer",fontFamily:MONO,fontSize:11 }}>{c.evidence_cta} →</motion.button>
-        </section>
-        </Reveal>
-
-        <Reveal>
-        <section style={{ paddingTop:86 }}>
-          <div style={{ padding:"28px",borderRadius:20,border:`1px solid ${LINE}`,background:"linear-gradient(135deg,rgba(154,140,245,.06),rgba(52,224,190,.045))" }}>
-            <div style={{ fontFamily:MONO,fontSize:10,letterSpacing:1.6,color:AMBER,marginBottom:9 }}>{c.compare_eyebrow}</div><h2 style={{ margin:0,fontSize:29,letterSpacing:-.9 }}>{c.compare_title}</h2><p style={{ color:MUTE,maxWidth:760,lineHeight:1.65,fontSize:14 }}>{c.compare_sub}</p>
-            <div className="guide-compare" style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:20 }}>
-              {[ ["Semaglutide",c.compare_human,TEAL], ["BPC-157",c.compare_preclinical,VIOLET] ].map(([name,label,color])=><motion.button key={name} whileHover={reduceMotion ? undefined : {y:-4,scale:1.008,boxShadow:`0 16px 48px ${color}12`}} whileTap={reduceMotion ? undefined : {scale:.985}} transition={MOTION_SPRING} onClick={()=>onResearch(name,"peptide")} style={{ textAlign:"left",padding:"18px 19px",borderRadius:14,border:`1px solid ${color}40`,background:`${color}0B`,cursor:"pointer",color:TEXT }}><div style={{ fontFamily:MONO,fontSize:9.5,color,letterSpacing:1.1 }}>{label.toUpperCase()}</div><div style={{ fontSize:22,fontWeight:750,marginTop:6 }}>{name}</div><motion.div animate={reduceMotion ? undefined : {x:[0,2,0]}} transition={reduceMotion ? undefined : {duration:2.4,repeat:Infinity,repeatDelay:2}} style={{ color:MUTE,fontSize:12,marginTop:8 }}>{c.open_profile} →</motion.div></motion.button>)}
-            </div>
-          </div>
-        </section>
-        </Reveal>
-      </main>
-    </div>
-  );
+function HomePage({langState,onResearch,onLearn,onHome}) {
+  return <div style={{background:INK,minHeight:"100vh",color:TEXT}}><GuideTopBar langState={langState} onResearch={onResearch} onHome={onHome} onLearn={onLearn} active="home"/><PlatformHome/></div>;
 }
 
 function LearnPage({ langState, initialSection, onResearch, onHome, onLearn }) {
@@ -3127,6 +2577,9 @@ export default function Clarity() {
   if (!initialRouteRef.current) initialRouteRef.current = parseBrowserRoute();
   const initialRoute = initialRouteRef.current;
   const [tab, setTab] = useState(initialRoute.tab || "home");
+  const activeTabRef = useRef(tab);
+  activeTabRef.current = tab;
+  const [evidencePath, setEvidencePath] = useState(initialRoute.path || "/explore");
   const reduceMotion = useReducedMotion();
   const langState = useState(() => {
     try { return localStorage.getItem("clarity_lang") || "en"; } catch { return "en"; }
@@ -3143,19 +2596,26 @@ export default function Clarity() {
 
   const setTitle = (label) => {
     if (typeof document === "undefined") return;
-    document.title = label ? `${label} | Clarity` : "Clarity — The Data, Told Straight";
+    const evidenceMeta = isEvidencePath(window.location.pathname) ? evidenceMetadata(window.location.pathname) : null;
+    if (evidenceMeta) label = evidenceMeta.title;
+    document.title = label ? `${label} | Clarity` : "Clarity — Health Evidence Platform";
     const description = label
       ? `${label}: graded evidence from PubMed + Europe PMC, with human, animal, and mechanistic evidence kept separate.`
-      : "Clarity explains evidence for peptides, supplements, and other compounds using graded PubMed + Europe PMC research.";
+      : "Clarity is a health evidence platform for interventions, biomarkers, diagnostics, screening, and precision medicine. Findings, uncertainty, and sources remain visible.";
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) { meta = document.createElement("meta"); meta.setAttribute("name", "description"); document.head.appendChild(meta); }
-    meta.setAttribute("content", description);
+    meta.setAttribute("content", evidenceMeta?.description || description);
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) { canonical = document.createElement("link"); canonical.setAttribute("rel", "canonical"); document.head.appendChild(canonical); }
     canonical.setAttribute("href", `${window.location.origin}${window.location.pathname}`);
   };
 
-  const goResearch = (topic, category) => {
+  const goEvidence = withTransition((path = "/explore") => {
+    jumpToPageTop(); setEvidencePath(path); setTab("explore"); writeBrowserRoute(path); setTitle("Explore health evidence");
+  });
+  const goResearch = withTransition((topic, category) => {
+    const evidence = topic ? findEvidence(topic) : null;
+    if (evidence && !category) { goEvidence(entityPath(evidence)); return; }
     jumpToPageTop();
     setResearchVisited(true);
     if (topic) {
@@ -3168,31 +2628,33 @@ export default function Clarity() {
       setTitle("Research");
     }
     setTab("research");
-  };
-  const goResearchRoot = () => {
+  });
+  const goResearchRoot = withTransition(() => {
     jumpToPageTop();
     setResearchVisited(true); setResearchRequest({ id:++requestSeq.current, clear:true }); setTab("research");
     writeBrowserRoute("/research"); setTitle("Research");
-  };
-  const goMethodology = () => {
+  });
+  const goMethodology = withTransition(() => {
     jumpToPageTop(); setResearchVisited(true); setResearchRequest({ id:++requestSeq.current, methodology:true }); setTab("research");
     writeBrowserRoute("/methodology"); setTitle("Methodology");
-  };
-  const goLearn = (section = "basics") => {
+  });
+  const goLearn = withTransition((section = "basics") => {
     jumpToPageTop(); setLearnSection(section); setTab("learn");
     writeBrowserRoute(section === "evidence" ? "/learn/evidence" : "/learn/basics");
     setTitle(section === "evidence" ? "Evidence guide" : "Learn");
-  };
-  const goHome = () => { jumpToPageTop(); setTab("home"); writeBrowserRoute("/"); setTitle(null); };
-  const goPrivacy = () => { jumpToPageTop(); setTab("privacy"); writeBrowserRoute("/privacy"); setTitle("Privacy"); };
-  const goTerms = () => { jumpToPageTop(); setTab("terms"); writeBrowserRoute("/terms"); setTitle("Terms"); };
-  const onProfileOpen = (name) => { writeBrowserRoute(compoundRoute(name)); setTitle(name); };
+  });
+  const goHome = withTransition(() => { jumpToPageTop(); setTab("home"); writeBrowserRoute("/"); setTitle(null); });
+  const goPrivacy = withTransition(() => { jumpToPageTop(); setTab("privacy"); writeBrowserRoute("/privacy"); setTitle("Privacy"); });
+  const goTerms = withTransition(() => { jumpToPageTop(); setTab("terms"); writeBrowserRoute("/terms"); setTitle("Terms"); });
+  const onProfileOpen = (name) => { if (activeTabRef.current !== "research") return; writeBrowserRoute(compoundRoute(name)); setTitle(name); };
 
   useEffect(() => {
     const apply = () => {
       const r = parseBrowserRoute();
       jumpToPageTop();
-      if (r.tab === "research") {
+      if (r.tab === "explore") {
+        setEvidencePath(r.path); setTab("explore"); setTitle("Explore health evidence");
+      } else if (r.tab === "research") {
         setResearchVisited(true); setTab("research");
         setResearchRequest({ id:++requestSeq.current, ...(r.request || {clear:true}) });
         if (r.request?.topic) setTitle(r.request.topic); else if (r.request?.methodology) setTitle("Methodology"); else setTitle("Research");
@@ -3202,22 +2664,37 @@ export default function Clarity() {
       else if (r.tab === "terms") { setTab("terms"); setTitle("Terms"); }
       else { setTab("home"); setTitle(null); }
     };
-    window.addEventListener("popstate", apply);
+    const onPop = () => transitionView(apply);
+    window.addEventListener("popstate", onPop);
     apply();
-    return () => window.removeEventListener("popstate", apply);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   useEffect(() => { jumpToPageTop(); }, [tab]);
 
+  const handleNavigationClick = (event) => {
+    if (animateDisclosure(event)) return;
+    const anchor = event.target.closest?.('a[href]');
+    if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || anchor.target || anchor.hasAttribute('download')) return;
+    const url = new URL(anchor.href, window.location.href);
+    if (url.origin !== window.location.origin || url.hash || url.search) return;
+    const path = url.pathname;
+    if (!isEvidencePath(path) && !/^\/(?:research|methodology|learn(?:\/.*)?|privacy|terms|compound\/[^/]+)?$/.test(path)) return;
+    event.preventDefault(); event.stopPropagation();
+    if (path === window.location.pathname) return;
+    transitionView(() => { writeBrowserRoute(path); window.dispatchEvent(new PopStateEvent('popstate')); });
+  };
+
   const tabs = [
     { k:"home", label:c.nav_home, icon:Sparkles },
+    { k:"explore", label:langState[0]==="es"?"Explorar":"Explore", icon:Search },
     { k:"research", label:c.nav_research, icon:BookOpen },
     { k:"learn", label:c.nav_learn, icon:FlaskConical },
   ];
 
   return (
     <LangContext.Provider value={langState}>
-      <div style={{ minHeight:"100vh", background:INK, color:TEXT, fontFamily:DISPLAY }}>
+      <div onClickCapture={handleNavigationClick} style={{ minHeight:"100vh", background:INK, color:TEXT, fontFamily:DISPLAY }}>
         <style>{`
           :focus-visible{outline:2px solid ${TEAL}!important;outline-offset:3px}
           button:focus-visible,input:focus-visible,a:focus-visible{box-shadow:0 0 0 4px rgba(52,224,190,.12)}
@@ -3225,14 +2702,15 @@ export default function Clarity() {
           .mobile-bottom-nav{display:none!important}.desktop-top-nav{display:flex!important}
           @media(max-width:760px){.mobile-bottom-nav{display:flex!important}.desktop-top-nav{display:none!important}.page-with-mobile-dock{padding-bottom:124px!important}}
         `}</style>
-        <div className="page-with-mobile-dock" style={{ paddingBottom:40 }}>
-          <AnimatePresence mode="popLayout" initial={false}>
-            {tab === "home" ? <motion.div key="home-page" style={{width:"100%"}} initial={reduceMotion?false:{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={reduceMotion?undefined:{opacity:0,y:-6}} transition={reduceMotion?{duration:0}:PAGE_TRANSITION}><HomePage langState={langState} onResearch={goResearch} onLearn={goLearn} onHome={goHome}/></motion.div> : null}
-            {tab === "learn" ? <motion.div key="learn-page" style={{width:"100%"}} initial={reduceMotion?false:{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={reduceMotion?undefined:{opacity:0,y:-6}} transition={reduceMotion?{duration:0}:PAGE_TRANSITION}><LearnPage langState={langState} initialSection={learnSection} onResearch={goResearch} onHome={goHome} onLearn={goLearn}/></motion.div> : null}
-            {tab === "privacy" ? <motion.div key="privacy-page" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><PolicyPage kind="privacy" onHome={goHome} onMethodology={goMethodology}/></motion.div> : null}
-            {tab === "terms" ? <motion.div key="terms-page" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><PolicyPage kind="terms" onHome={goHome} onMethodology={goMethodology}/></motion.div> : null}
-          </AnimatePresence>
-          {researchVisited && <motion.div initial={false} animate={tab === "research" ? {opacity:1,y:0} : {opacity:0,y:8}} transition={reduceMotion?{duration:0}:PAGE_TRANSITION} style={{display:tab === "research"?"block":"none",width:"100%",margin:0,padding:0}}><ResearchTab langState={langState} initialRequest={researchRequest} onHome={goHome} onLearn={goLearn} onProfileOpen={onProfileOpen} onResearchRoot={goResearchRoot} onMethodologyOpen={goMethodology}/></motion.div>}
+        <div data-route-surface className="page-with-mobile-dock" style={{ paddingBottom:40 }}>
+          <React.Fragment>
+            {tab === "home" ? <div key="home-page" style={{width:"100%"}}><HomePage langState={langState} onResearch={goResearch} onLearn={goLearn} onHome={goHome} onEvidence={goEvidence}/></div> : null}
+            {tab === "learn" ? <div key="learn-page" style={{width:"100%"}}><LearnPage langState={langState} initialSection={learnSection} onResearch={goResearch} onHome={goHome} onLearn={goLearn}/></div> : null}
+            {tab === "privacy" ? <div key="privacy-page" style={{width:"100%"}}><PolicyPage kind="privacy" onHome={goHome} onMethodology={goMethodology}/></div> : null}
+            {tab === "terms" ? <div key="terms-page" style={{width:"100%"}}><PolicyPage kind="terms" onHome={goHome} onMethodology={goMethodology}/></div> : null}
+          </React.Fragment>
+          {tab === "explore" && <React.Suspense fallback={<p role="status" style={{padding:32}}>Loading evidence library…</p>}><EvidenceExplorer path={evidencePath} go={goEvidence} onHome={goHome} onResearch={goResearchRoot}/></React.Suspense>}
+          {researchVisited && <div style={{display:tab === "research"?"block":"none",width:"100%"}}><ResearchTab langState={langState} initialRequest={researchRequest} onHome={goHome} onLearn={goLearn} onProfileOpen={onProfileOpen} onResearchRoot={goResearchRoot} onMethodologyOpen={goMethodology} onEvidence={goEvidence}/></div>}
 
           <footer style={{ maxWidth:960, margin:"56px auto 0", padding:"20px 24px 8px", borderTop:`1px solid ${LINE}`, display:"flex", justifyContent:"center", flexWrap:"wrap", gap:16, fontFamily:MONO, fontSize:10, color:"#667893" }}>
             <a href="/methodology" onClick={(e)=>{e.preventDefault();goMethodology();}} style={{color:"inherit",textDecoration:"none"}}>{langState[0]==="es"?"Metodología":"Methodology"}</a>
@@ -3244,7 +2722,7 @@ export default function Clarity() {
 
         <div className="mobile-bottom-nav" style={{ position:"fixed",bottom:0,left:0,right:0,zIndex:60,pointerEvents:"none",padding:"0 14px 12px",display:"flex",justifyContent:"center" }}>
           <div style={{pointerEvents:"auto",display:"flex",width:"100%",maxWidth:520,padding:5,gap:4,borderRadius:17,background:"rgba(10,13,20,.88)",backdropFilter:"blur(18px)",WebkitBackdropFilter:"blur(18px)",border:"1px solid rgba(255,255,255,.09)",boxShadow:"0 14px 45px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.025)"}}>
-            {tabs.map((item)=>{const Ic=item.icon;const on=tab===item.k;return <motion.button key={item.k} whileHover={reduceMotion?undefined:{y:-1}} whileTap={reduceMotion?undefined:{scale:.97}} transition={MOTION_SPRING} aria-current={on ? "page" : undefined} onClick={()=>item.k==="home"?goHome():item.k==="research"?goResearch(null,null):goLearn("basics")} style={{flex:1,position:"relative",display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"9px 11px",minHeight:42,border:"none",borderRadius:12,cursor:"pointer",background:"transparent",color:on?TEAL:MUTE,overflow:"hidden"}}>
+            {tabs.map((item)=>{const Ic=item.icon;const on=tab===item.k;return <motion.button key={item.k} whileHover={reduceMotion?undefined:{y:-1}} whileTap={reduceMotion?undefined:{scale:.97}} transition={MOTION_SPRING} aria-current={on ? "page" : undefined} onClick={()=>item.k==="home"?goHome():item.k==="explore"?goEvidence():item.k==="research"?goResearch(null,null):goLearn("basics")} style={{flex:1,position:"relative",display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"9px 11px",minHeight:42,border:"none",borderRadius:12,cursor:"pointer",background:"transparent",color:on?TEAL:MUTE,overflow:"hidden"}}>
               {on?<motion.div layoutId="bottom-nav-active-pill" transition={MOTION_SPRING} style={{position:"absolute",inset:0,borderRadius:12,background:"rgba(52,224,190,.095)",border:"1px solid rgba(52,224,190,.22)",boxShadow:"inset 0 0 18px rgba(52,224,190,.03)"}}/>:null}
               <motion.div animate={on&&!reduceMotion?{scale:1.05}:{scale:1}} transition={MOTION_SPRING} style={{display:"grid",position:"relative",zIndex:1}}><Ic size={17} color={on?TEAL:MUTE}/></motion.div><span style={{fontFamily:MONO,fontSize:10,fontWeight:on?700:500,position:"relative",zIndex:1}}>{item.label}</span>
             </motion.button>})}

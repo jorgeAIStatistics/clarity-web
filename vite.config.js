@@ -6,5 +6,5 @@ import react from "@vitejs/plugin-react";
 // `npm run build` -> static files in dist/ for deploying to Render/Vercel/Netlify
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173, open: true },
+  server: { port: 5173, open: true, proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true } } },
 });
