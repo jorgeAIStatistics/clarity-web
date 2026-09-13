@@ -4,7 +4,7 @@ export function studyLayer(s){
   if(s.is_protocol||/\b(study protocol|trial protocol|protocol for (a|an|the) .{0,40}trial)\b/.test(String(s.title||'').toLowerCase())||design.includes('protocol'))return 'protocol';
   if(/guideline|practice recommendation|regulatory/.test(design))return 'guidelines';
   if(/animal|mouse|mice|rat\b|preclinical/.test(population)||/animal/.test(design))return 'preclinical';
-  if(/in.?vitro|cell|mechanis/.test(population+' '+design))return 'mechanism';
+  if(/in.?vitro|cell[- ](?:line|culture|based)|mechanis/.test(population+' '+design))return 'mechanism';
   if(/meta.analysis|systematic review/.test(design))return 'synthesis';
   if(!/human/.test(population))return 'unclassified';
   if(/random|rct|clinical trial|intervention/.test(design))return 'interventional';
@@ -17,7 +17,7 @@ export function compoundBrief(view){const studies=uniqueStudies(view.outcomes||[
 export function entityBrief(e){
  const studies=e.studies||[];
  const findings=studies.flatMap(s=>(s.findings|| (s.effect?[s]:[])).map(f=>({...f,study:s})));
- const quantitative=findings.map((f,i)=>({name:f.outcome,key:`${f.study.id}:${i}`,grade:'Automated appraisal',direction:'Reported estimate',effect:`${f.effect.measure}: ${f.effect.estimate}${f.effect.lower!=null&&f.effect.upper!=null?` (${f.effect.confidence_level}% CI ${f.effect.lower}–${f.effect.upper})`:''}${f.effect.units?` · ${f.effect.units}`:''}`,effectQuote:f.quote||f.study.quote,effectSource:f.study.url,population:f.study.population,exposure:f.study.exposure||e.exposure,studies:[f.study]}));
+ const quantitative=findings.map((f,i)=>({name:f.outcome,key:`${f.study.id}:${i}`,effectData:f.effect,comparator:f.study.comparator,grade:'Automated appraisal',direction:'Reported estimate',effect:`${f.effect.measure}: ${f.effect.estimate}${f.effect.lower!=null&&f.effect.upper!=null?` (${f.effect.confidence_level}% CI ${f.effect.lower}–${f.effect.upper})`:''}${f.effect.units?` · ${f.effect.units}`:''}`,effectQuote:f.quote||f.study.quote,effectSource:f.study.url,population:f.study.population,exposure:f.study.exposure||e.exposure,studies:[f.study]}));
  return {related:[...(e.relatedProfiles||[]),...(e.related_interventions||[])],targetId:'entity:'+e.id,name:e.name,type:e.entity_type.replaceAll('_',' '),aliases:e.aliases||[],maturity:e.review_status==='reviewed'?'Reviewed by dimension':studies.length?'Human evidence indexed':'Appraisal incomplete',reviewStatus:e.review_status,lastEnriched:e.last_enriched_at,updates:e.updates||[],summary:e.summary,studies,sourceCount:studies.length,
  outcomes:[...quantitative,...e.outcomes.filter(o=>!findings.some(f=>f.outcome===o.name)).map(o=>({name:o.name,key:o.name,grade:'Appraisal pending',direction:'Extraction pending',effect:'No extracted estimate for this outcome',studies:[]}))],
  limitations:[e.context,'Selected source records are not an exhaustive search. Automated extracts have not undergone human risk-of-bias review.','A missing layer indicates incomplete catalog coverage, not that no evidence exists.',studies.some(s=>s.cohort_id&&studies.filter(t=>t.cohort_id===s.cohort_id).length>1)?'Multiple publications may describe the same trial. Publication counts are not independent participant counts.':null].filter(Boolean),sources:e.sources||[]};

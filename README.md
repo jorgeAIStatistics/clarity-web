@@ -146,3 +146,22 @@ Library cards expose publication and quantified-outcome counts, extraction dates
 The engine exports the full `src/evidence/catalog.json`, a small navigation `catalog-index.json`, and `frameworks.json`; full study text loads with the domain explorer rather than the homepage. Re-export all three together. New source estimates, profile rows and plots retain publication identifiers and exact abstract spans; `Automated appraisal` is separate from human review. See the engine's `evidence/ENRICHMENT.md` for validation and provenance.
 
 Matcher scope remains pasted research text → entity/lexical ranking → source passages and record gaps. No embeddings, private workspaces, personal-health interpretation, or automatic support/contradiction judgments.
+
+## Table preparation and source-depth release
+
+`/explore/matcher` accepts UTF-8 CSV/TSV locally (1 MB, 500 data rows, 40 columns),
+with separator/header selection, column mapping and a preview. Only reviewed mapped
+research text is submitted after the aggregate-content attestation; numeric fields
+are ignored. No files or queries are stored. Common identifier and personal-health
+requests are rejected, but this is not a de-identification service. Example files
+live in `public/examples`.
+
+Profiles separate reported findings from pending appraisal questions. Mini interval
+plots use row-specific scales and show the reference value 1; they do not pool studies
+or judge benefit. The four intervention overlays come from the validated engine export
+at `public/intervention-enrichment.json`. See `clarity-engine/evidence/ENRICHMENT.md`
+for counts, provenance, scope and export commands.
+
+Verification: `node --test src/platform/*.test.js src/evidence/*.test.js` and
+`npm run build`; browser checks cover CSV/TSV preparation, header correction, research
+attestation, ranked results, pending states and mobile profile layout.

@@ -702,7 +702,7 @@ function ResearchTab({ langState, initialRequest, onHome, onLearn, onProfileOpen
     const ce = CATALOG.find((c) => c[0].toLowerCase() === String(topic).toLowerCase())
             || CATALOG.find((c) => c[0].toLowerCase().includes(String(topic).toLowerCase()));
     setPending(ce ? { name: ce[0], cat: ce[1], tier: null } : { name: topic, cat: category, tier: null });
-    setPhase("Searching PubMed and grading the evidence… this can take up to a minute.");
+    setPhase("Loading the evidence profile and available source records…");
     jumpToPageTop();
     // Clean the DISPLAY name into a searchable term: drop parenthetical labels
     // ("Semaglutide (GLP-1)" -> "Semaglutide") and slash-suffixes ("Protein / whey"

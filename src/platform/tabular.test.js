@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {parseTable,defaultMapping,mappedQuery,researchInputError} from './tabular.js';
+test('quoted CSV, escaped quotes, CRLF and multi-line cells survive parsing',()=>{const t=parseTable('\uFEFFMarker,Context,Estimate\r\nApoB,"cohort, \"\"adjusted\"\"\nanalysis",1.04\r\n');assert.deepEqual(t.rows,[['ApoB','cohort, "adjusted"\nanalysis','1.04']]);});
+test('TSV and preamble header selection with ragged rows',()=>{const t=parseTable('Export\nMarker\tOutcome\nHbA1c\tDiabetes\nApoB\n\n','auto',2);assert.equal(t.delimiter,'\t');assert.equal(t.ragged,1);assert.deepEqual(t.rows[1],['ApoB','']);});
+test('duplicate and missing headers retain each column',()=>{assert.deepEqual(parseTable('Marker,Marker,\nA,B,C').headers,['Marker','Marker (2)','Column 3']);});
+test('numeric fields ignored, duplicate research rows removed',()=>{const t=parseTable('Marker,Outcome,Estimate\nApoB,CVD,1.04\nApoB,CVD,1.09');const result=mappedQuery(t,defaultMapping(t.headers));assert.equal(result.uniqueRows,1);assert.equal(result.query,'topic: ApoB; outcome: CVD');});
+test('malformed quotes and empty data rejected',()=>{for(const input of ['Marker\n"ApoB','Marker\n"ApoB"extra','Marker'])assert.throws(()=>parseTable(input));});
+test('bounded bytes, columns, rows and query',()=>{assert.throws(()=>parseTable('x'.repeat(1048577)));assert.throws(()=>parseTable(Array(41).fill('x').join(',')+'\ny'));assert.throws(()=>parseTable('Marker\n'+Array(501).fill('ApoB').join('\n')));assert.throws(()=>mappedQuery({rows:[['x'.repeat(12001)]]},['topic']));});
+test('mapping requires research topics and textual values',()=>{assert.throws(()=>mappedQuery({rows:[['12']]},['topic']));assert.throws(()=>mappedQuery({rows:[['ApoB']]},['ignore']));});
+test('common identifier fields and personal interpretation rejected',()=>{for(const t of ['patient_id,ApoB','DOB,Marker','Email: someone@example.com','Here are my blood results','what should I take for this'])assert.ok(researchInputError(t));assert.equal(researchInputError('A study of patients with diabetes and HbA1c biomarkers'),'');});
+test('formulas remain literal and are never evaluated',()=>{assert.equal(parseTable('Marker\n=1+1').rows[0][0],'=1+1');});
