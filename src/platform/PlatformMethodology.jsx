@@ -1,5 +1,5 @@
 import React from 'react';
-import catalog from '../evidence/catalog.json';
+import catalog from '../evidence/frameworks.json';
 import './platform.css';
 export default function PlatformMethodology(){return <section className="profile-brief" lang="en"><p className="hp-eyebrow">ONE PLATFORM / DISTINCT FRAMEWORKS</p><h2>How a health question becomes an evidence profile</h2><p className="pb-lead">The framework follows the question. An intervention grade cannot stand in for test accuracy, screening benefit, or a biomarker’s clinical utility.</p><div className="pb-table-wrap" tabIndex={0} role="region" aria-label="Evidence frameworks"><table className="pb-table"><thead><tr><th scope="col">Domain</th><th scope="col">Question</th><th scope="col">Assessment</th></tr></thead><tbody>{Object.entries(catalog.frameworks).map(([type,f])=><tr key={type}><td>{type.replaceAll('_',' ')}</td><td>{f.question||'What outcome-specific evidence supports the intervention?'}</td><td>{f.method}</td></tr>)}</tbody></table></div><div className="pb-section"><h2>Living research, with review</h2><ol>{[
  'Discover due profiles and search PubMed, Europe PMC, and ClinicalTrials.gov using the profile’s terms and context.',

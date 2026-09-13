@@ -137,3 +137,12 @@ contradicting interpretation is an explicit review step. The response schema
 reserves agreement assessments and preserves source passages and offsets.
 See clarity-engine/evidence/RESEARCHER.md for private-workspace, upload and
 semantic-retrieval extension boundaries.
+
+
+## Source depth and visual system (September 2026)
+
+Library cards expose publication and quantified-outcome counts, extraction dates, and review status. Default ordering alternates domains, prioritizing populated records within each domain. Colors label domain and evidence layer, never statistical significance. Motion respects reduced-motion settings.
+
+The engine exports the full `src/evidence/catalog.json`, a small navigation `catalog-index.json`, and `frameworks.json`; full study text loads with the domain explorer rather than the homepage. Re-export all three together. New source estimates, profile rows and plots retain publication identifiers and exact abstract spans; `Automated appraisal` is separate from human review. See the engine's `evidence/ENRICHMENT.md` for validation and provenance.
+
+Matcher scope remains pasted research text → entity/lexical ranking → source passages and record gaps. No embeddings, private workspaces, personal-health interpretation, or automatic support/contradiction judgments.

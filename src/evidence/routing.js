@@ -1,4 +1,4 @@
-import catalog from './catalog.json';
+import catalog from './catalog-index.json';
 export const TYPES = {biomarker:'Biomarkers', diagnostic:'Diagnostics', screening:'Screening', precision_oncology:'Precision medicine'};
 export const PATHS = {biomarker:'biomarkers', diagnostic:'diagnostics', screening:'screening', precision_oncology:'precision-medicine'};
 export const entityPath = entity => `/${PATHS[entity.entity_type]}/${entity.id}`;

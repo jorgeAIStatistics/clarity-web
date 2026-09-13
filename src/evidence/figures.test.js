@@ -25,3 +25,7 @@ test('risk and response charts reject values outside probability bounds',()=>{
  assert.throws(()=>validateFigure({...EXAMPLE_FIGURES[0],rows:[{x:1,y:1.1}]}));
  assert.throws(()=>validateFigure({...EXAMPLE_FIGURES.at(-1),rows:[{row:'A',column:'B',value:1.1}]}));
 });
+test('published catalog graphics reproduce source estimates',async()=>{
+ const {readFileSync}=await import('node:fs');const catalog=JSON.parse(readFileSync(new URL('./catalog.json',import.meta.url),'utf8'));
+ for(const e of catalog.entities)for(const f of e.figures||[]){validateFigure(f);for(const row of f.rows){assert.ok(e.studies.some(s=>s.url===f.source_url&&[...(s.findings||[]),...(s.effect?[s]:[])].some(x=>x.effect.estimate===row.estimate&&x.effect.lower===row.lower&&x.effect.upper===row.upper)));}}
+});
