@@ -1,5 +1,5 @@
 import { researchInputError } from '../platform/tabular.js';
-export const VERSION = 'research-workspace-v1';
+export const VERSION = 'research-workspace-v2';
 export const FIELDS = {
   population: 'Population / model',
   exposure: 'Intervention / exposure',
@@ -24,7 +24,10 @@ export const FIELDS = {
   route: 'Route',
   culture: 'Culture conditions',
   censoring: 'Censoring',
-  repeated: 'Repeated measures'
+  repeated: 'Repeated measures',
+  exposure_assay: 'Exposure assay',
+  outcome_definition: 'Outcome definition',
+  modifier: 'Important modifier'
 };
 export const DIMENSIONS = ['population', 'exposure', 'comparator', 'outcome', 'instrument', 'design', 'dose', 'duration', 'timepoint', 'species', 'metric'];
 const norm = x => String(x || '').normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
