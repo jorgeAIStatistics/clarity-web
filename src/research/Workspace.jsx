@@ -73,13 +73,16 @@ export default function Workspace() {
     });
   }, [inspect, reduced]);
   useEffect(() => {
-    const name = new URLSearchParams(location.search).get('evidence');
+    const params = new URLSearchParams(location.search);
+    const name = params.get('evidence');
+    const outcome = params.get('outcome') || '';
     if (name) setP(v => ({
       ...v,
-      text: `Research question about ${name}`,
+      text: `Research question about ${name}${outcome ? ` and ${outcome}` : ''}`,
       definition: {
         ...v.definition,
-        exposure: name
+        exposure: name,
+        outcome
       }
     }));
   }, []);
