@@ -15,3 +15,13 @@ test('AUC distinguishes complete curves from incomplete coordinates',()=>{
   assert.equal(rocArea([{x:.1,y:.2},{x:.8,y:.9}]),null);
   assert.throws(()=>rocArea([{x:0,y:0},{x:.5,y:.8},{x:.4,y:1}]));
 });
+test('forest plots require a measure and positive ratio intervals',()=>{
+ const forest=EXAMPLE_FIGURES.find(f=>f.type==='forest');
+ assert.throws(()=>validateFigure({...forest,measure:undefined}));
+ assert.throws(()=>validateFigure({...forest,rows:[{estimate:.5,lower:0,upper:1}]}));
+ assert.doesNotThrow(()=>validateFigure({...forest,measure:'mean_diff',rows:[{estimate:0,lower:-1,upper:1}]}));
+});
+test('risk and response charts reject values outside probability bounds',()=>{
+ assert.throws(()=>validateFigure({...EXAMPLE_FIGURES[0],rows:[{x:1,y:1.1}]}));
+ assert.throws(()=>validateFigure({...EXAMPLE_FIGURES.at(-1),rows:[{row:'A',column:'B',value:1.1}]}));
+});

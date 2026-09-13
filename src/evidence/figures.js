@@ -14,14 +14,19 @@ export function validateFigure(figure) {
     for (const value of Object.values(row)) {
       if (typeof value === 'number' && !Number.isFinite(value)) throw new Error('Non-finite figure value.');
     }
-    if (['forest'].includes(figure.type)) {
+    if (figure.type === 'forest') {
+      if (!['hr','rr','or','mean_diff','smd','risk_diff'].includes(figure.measure)) throw new Error('Explicit effect measure required.');
+      if (['hr','rr','or'].includes(figure.measure) && row.lower<=0) throw new Error('Ratio intervals must be positive.');
       if (![row.lower,row.estimate,row.upper].every(x=>typeof x==='number') || row.lower>row.estimate || row.estimate>row.upper) throw new Error('Invalid effect interval.');
     } else if (figure.type === 'correlation') {
       if (typeof row.value !== 'number' || Math.abs(row.value)>1) throw new Error('Invalid correlation.');
-    } else if (figure.type !== 'response_matrix') {
+    } else if (figure.type === 'response_matrix') {
+      if (typeof row.value!=='number' || row.value<0 || row.value>1) throw new Error('Response proportions must lie between 0 and 1.');
+    } else {
       if (typeof row.x !== 'number' || typeof row.y !== 'number') throw new Error('Numeric coordinates required.');
       if (['roc','calibration'].includes(figure.type) && (row.x<0||row.x>1||row.y<0||row.y>1)) throw new Error('Probabilities must lie between 0 and 1.');
       if (figure.type==='kaplan_meier' && (row.x<0||row.y<0||row.y>1)) throw new Error('Invalid survival coordinate.');
+      if (figure.type==='risk_curve' && (row.y<0||row.y>1)) throw new Error('Risk must be a probability.');
       if (figure.type==='distribution' && row.y<0) throw new Error('Negative frequency.');
     }
   }
@@ -38,7 +43,7 @@ export function rocArea(rows) {
   if (rows[0].x!==0 || rows[0].y!==0 || rows.at(-1).x!==1 || rows.at(-1).y!==1) return null;
   return rows.slice(1).reduce((sum,p,i)=>sum+(p.x-rows[i].x)*(p.y+rows[i].y)/2,0);
 }
-const example = (type,title,caption,x_label,y_label,rows) => ({type,title,caption,x_label,y_label,rows,illustrative:true});
+const example = (type,title,caption,x_label,y_label,rows) => ({type,title,caption,x_label,y_label,rows,illustrative:true,...(type==='forest'?{measure:'hr'}:{})});
 export const EXAMPLE_FIGURES = [
   example('risk_curve','Association across a measurement range','Synthetic curve. The shape illustrates an association and cannot establish causality.','Measurement (arbitrary units)','Outcome probability', [{x:1,y:.04},{x:2,y:.06},{x:3,y:.09},{x:4,y:.15},{x:5,y:.24}]),
   example('distribution','A reference population has a distribution','Synthetic frequency bins. A common value is not necessarily an optimal value or a treatment target.','Measurement bin (arbitrary units)','People in bin',[{x:1,y:10},{x:2,y:35},{x:3,y:80},{x:4,y:120},{x:5,y:80},{x:6,y:35},{x:7,y:10}]),
