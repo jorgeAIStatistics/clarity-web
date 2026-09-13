@@ -17,7 +17,7 @@ export function compoundBrief(view){const studies=uniqueStudies(view.outcomes||[
 export function entityBrief(e){
  const studies=e.studies||[];
  return {
-  targetId:'entity:'+e.id,name:e.name,type:e.entity_type.replaceAll('_',' '),aliases:e.aliases||[],
+  related:e.relatedProfiles||[],targetId:'entity:'+e.id,name:e.name,type:e.entity_type.replaceAll('_',' '),aliases:e.aliases||[],
   maturity:e.review_status==='reviewed'?'Reviewed by dimension':'Appraisal incomplete',summary:e.summary,
   studies,sourceCount:studies.length,
   outcomes:e.outcomes.map(o=>{

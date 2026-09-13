@@ -14,7 +14,7 @@ export function evidenceMetadata(path) {
   const type = Object.keys(PATHS).find(key => PATHS[key] === root);
   const entity = catalog.entities.find(e => e.id === slug && e.entity_type === type);
   return {
-    title: root==='explore'&&slug==='visualizations' ? 'Scientific visualization studio' : entity?.name || TYPES[type] || (root === 'conditions' ? 'Evidence by condition' : root === 'tests' ? 'Diagnostics & screening' : 'Explore health evidence'),
+    title: root==='explore'&&slug==='matcher'?'Evidence Matcher':root==='explore'&&slug==='compare'?'Compare evidence profiles':root==='explore'&&slug==='visualizations' ? 'Scientific visualization studio' : entity?.name || TYPES[type] || (root === 'conditions' ? 'Evidence by condition' : root === 'tests' ? 'Diagnostics & screening' : 'Explore health evidence'),
     description: entity?.summary || 'Explore biomarkers, diagnostics, screening, and precision medicine with source-linked evidence and interactive statistics.',
   };
 }

@@ -118,3 +118,22 @@ Clarity content, not exhaustive medical coverage. Twenty stored profiles need
 appraisal refresh for protocol records; their dates/grades were not rewritten.
 The analysis workbench requires deployment of the updated engine API alongside
 the frontend. No new paid extraction or production deployment was performed.
+
+### Production deep links
+
+Build with `npm ci && npm run build`; publish `dist`. The Render static service
+requires a dashboard rewrite **/* → /index.html (Rewrite)**. `_redirects` alone
+is not consumed by Render. The rewrite is now configured on clarity-evidence;
+`render.yaml`, `netlify.toml`, and `vercel.json` document equivalent deployments.
+Verify direct GET requests to /explore, /learn, /methodology and individual
+profiles after deployment, not only client-side clicks from the homepage.
+
+### Researcher foundation
+
+/explore/matcher accepts research text and calls POST /api/evidence/match.
+This phase uses aliases, biomedical concept expansion and lexical retrieval.
+It makes no paid model calls and does not persist queries. Supporting versus
+contradicting interpretation is an explicit review step. The response schema
+reserves agreement assessments and preserves source passages and offsets.
+See clarity-engine/evidence/RESEARCHER.md for private-workspace, upload and
+semantic-retrieval extension boundaries.

@@ -1,3 +1,5 @@
+import PlatformLearn from './platform/PlatformLearn.jsx';
+import {canonicalPath} from './platform/routes.js';
 import Library from "./platform/Library.jsx";
 import {API_BASE} from "./platform/api.js";
 import PlatformMethodology from "./platform/PlatformMethodology.jsx";
@@ -62,9 +64,7 @@ function compoundRoute(name) { return `/compound/${routeSlug(name)}`; }
 
 function parseBrowserRoute() {
   if (typeof window === "undefined") return { tab:"home" };
-  let path = window.location.pathname || "/";
-  try { path = decodeURIComponent(path); } catch {}
-  path = path.replace(/\/+$/, "") || "/";
+  const path = canonicalPath(window.location.pathname);
   if (isEvidencePath(path)) return { tab:"explore", path };
   if (path === "/research") return { tab:"research", request:{ clear:true } };
   if (path === "/methodology") return { tab:"research", request:{ methodology:true } };
@@ -78,7 +78,7 @@ function parseBrowserRoute() {
     const entry = (typeof CATALOG !== "undefined") ? CATALOG.find((c)=>routeSlug(c[0])===slug) : null;
     return { tab:"research", request:{ topic:entry?.[0] || slug.replace(/-/g," "), category:entry?.[1] || "supplement" } };
   }
-  return { tab:"home" };
+  return { tab:path==="/"?"home":"not-found" };
 }
 
 function writeBrowserRoute(path, replace = false) {
@@ -2600,7 +2600,7 @@ export default function Clarity() {
     if (evidenceMeta) label = evidenceMeta.title;
     document.title = label ? `${label} | Clarity` : "Clarity — Health Evidence Platform";
     const description = label
-      ? `${label}: graded evidence from PubMed + Europe PMC, with human, animal, and mechanistic evidence kept separate.`
+      ? `${label}: source-linked health evidence, with findings, evidence layers, review status, and uncertainty kept visible.`
       : "Clarity is a health evidence platform for interventions, biomarkers, diagnostics, screening, and precision medicine. Findings, uncertainty, and sources remain visible.";
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) { meta = document.createElement("meta"); meta.setAttribute("name", "description"); document.head.appendChild(meta); }
@@ -2640,7 +2640,7 @@ export default function Clarity() {
   });
   const goLearn = withTransition((section = "basics") => {
     jumpToPageTop(); setLearnSection(section); setTab("learn");
-    writeBrowserRoute(section === "evidence" ? "/learn/evidence" : "/learn/basics");
+    writeBrowserRoute(section === "evidence" ? "/learn/evidence" : "/learn");
     setTitle(section === "evidence" ? "Evidence guide" : "Learn");
   });
   const goHome = withTransition(() => { jumpToPageTop(); setTab("home"); writeBrowserRoute("/"); setTitle(null); });
@@ -2650,6 +2650,8 @@ export default function Clarity() {
 
   useEffect(() => {
     const apply = () => {
+      const canonical=canonicalPath(window.location.pathname);
+      if(canonical!==window.location.pathname)history.replaceState(history.state,"",canonical+window.location.search+window.location.hash);
       const r = parseBrowserRoute();
       jumpToPageTop();
       if (r.tab === "explore") {
@@ -2662,6 +2664,7 @@ export default function Clarity() {
         setLearnSection(r.learnSection || "basics"); setTab("learn"); setTitle(r.learnSection === "evidence" ? "Evidence guide" : "Learn");
       } else if (r.tab === "privacy") { setTab("privacy"); setTitle("Privacy"); }
       else if (r.tab === "terms") { setTab("terms"); setTitle("Terms"); }
+      else if(r.tab==="not-found"){setTab("not-found");setTitle("Page not found");}
       else { setTab("home"); setTitle(null); }
     };
     const onPop = () => transitionView(apply);
@@ -2678,7 +2681,7 @@ export default function Clarity() {
     if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || anchor.target || anchor.hasAttribute('download')) return;
     const url = new URL(anchor.href, window.location.href);
     if (url.origin !== window.location.origin || url.hash || url.search) return;
-    const path = url.pathname;
+    const path = canonicalPath(url.pathname);
     if (!isEvidencePath(path) && !/^\/(?:research|methodology|learn(?:\/.*)?|privacy|terms|compound\/[^/]+)?$/.test(path)) return;
     event.preventDefault(); event.stopPropagation();
     if (path === window.location.pathname) return;
@@ -2688,7 +2691,7 @@ export default function Clarity() {
   const tabs = [
     { k:"home", label:c.nav_home, icon:Sparkles },
     { k:"explore", label:langState[0]==="es"?"Explorar":"Explore", icon:Search },
-    { k:"research", label:c.nav_research, icon:BookOpen },
+    { k:"research", label:langState[0]==="es"?"Intervenciones":"Interventions", icon:BookOpen },
     { k:"learn", label:c.nav_learn, icon:FlaskConical },
   ];
 
@@ -2705,7 +2708,8 @@ export default function Clarity() {
         <div data-route-surface className="page-with-mobile-dock" style={{ paddingBottom:40 }}>
           <React.Fragment>
             {tab === "home" ? <div key="home-page" style={{width:"100%"}}><HomePage langState={langState} onResearch={goResearch} onLearn={goLearn} onHome={goHome} onEvidence={goEvidence}/></div> : null}
-            {tab === "learn" ? <div key="learn-page" style={{width:"100%"}}><LearnPage langState={langState} initialSection={learnSection} onResearch={goResearch} onHome={goHome} onLearn={goLearn}/></div> : null}
+            {tab === "learn" ? <div key="learn-page" style={{width:"100%"}}><PlatformLearn/></div> : null}
+            {tab === "not-found" && <main className="profile-brief"><h1>Page not found</h1><p>This address does not match a Clarity page.</p><a href="/explore">Search the evidence library →</a></main>}
             {tab === "privacy" ? <div key="privacy-page" style={{width:"100%"}}><PolicyPage kind="privacy" onHome={goHome} onMethodology={goMethodology}/></div> : null}
             {tab === "terms" ? <div key="terms-page" style={{width:"100%"}}><PolicyPage kind="terms" onHome={goHome} onMethodology={goMethodology}/></div> : null}
           </React.Fragment>

@@ -23,11 +23,11 @@ export default function LivingResearch({targetId,compact=false}) {
     <div className="living-evidence-heading"><h2>Living research</h2><span>{!data?'Checking status…':data.monitoring_status==='checked'?'Literature checked':data.monitoring_status==='partial_failure'?'Some sources could not be checked':data.monitoring_status==='not_started'?'Monitoring has not started':'Monitoring is not connected'}</span></div>
     <p>Last completed literature check: <strong>{date(data?.last_checked)}</strong></p>
     <p className="living-evidence-note">{data?.updates_pending_review>0?`${data.updates_pending_review} candidate updates await review. `:''}New publications are reviewed before they appear here. Published updates retain their evidence type and sources; they do not automatically change the profile’s clinical grade.</p>
-    {data?.updates?.length>0?data.updates.map(update=><article key={update.proposal_id}>
+    {data?.updates?.length>0?<details><summary>Reviewed change history ({data.updates.length} updates)</summary>{data.updates.map(update=><article key={update.proposal_id}>
       <h3><a href={safeUrl(update.paper.url)} target="_blank" rel="noreferrer">{update.paper.title} ↗</a></h3>
       <p>{update.paper.is_preprint?'Preprint · ':''}{update.paper.nct_id?'Trial registry update · ':''}Reviewed by {update.review.reviewer} · {date(update.published_at)}</p>
       {update.summary&&<p>{update.summary}</p>}<p>{update.review.note}</p>
       <details><summary>View extracted findings and source passages</summary>{Object.entries(update.facts).map(([field,fact])=><div className="living-fact" key={field}><h4>{field.replaceAll('_',' ')}</h4><p>{fact.value}</p><blockquote>{fact.quote}</blockquote></div>)}</details>
-    </article>):data?.last_checked?<p>No reviewed research updates have been published for this profile yet.</p>:null}
+    </article>)}</details>:data?.last_checked?<p>No reviewed research updates have been published for this profile yet.</p>:null}
   </section>;
 }
