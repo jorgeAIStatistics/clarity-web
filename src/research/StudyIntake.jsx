@@ -18,9 +18,10 @@ export default function StudyIntake({
   const active = useRef(null),
     fieldRef = useRef(null),
     cardRef = useRef(null);
-  useEffect(() => () => active.current?.abort(), []);
+  useEffect(() => () => {active.current?.abort();active.current=null;}, []);
   useEffect(() => {
     active.current?.abort();
+    active.current=null;
     setBusy(false);
     setFailure('');
   }, [p.text]);
@@ -32,6 +33,7 @@ export default function StudyIntake({
     missing = unresolved(p.definition),
     recognized = meaningfulFields(p.definition),
     hasDraft = Boolean(p.draft && recognized >= 2 || editing || p.confirmed);
+  function editField(key,value) {active.current?.abort();active.current=null;setBusy(false);setFailure('');onField(key,value);}
   async function analyze() {
     active.current?.abort();
     const c = new AbortController();
@@ -79,10 +81,10 @@ export default function StudyIntake({
  {hasDraft && <section className="rw-panel rw-understood" ref={cardRef} aria-label="Parsed study summary"><p className="hp-eyebrow">DRAFT · YOUR REVIEW REQUIRED</p><h3>{recognized >= 2 ? 'Clarity understood your study as:' : 'Describe the key study details'}</h3>{p.draft?.paper && <div className="rw-paper"><span className="pb-chip">Paper recognized</span><h4><a href={safeSource(p.draft.paper.url)} target="_blank" rel="noreferrer">{p.draft.paper.title} ↗</a></h4><p>{p.draft.paper.authors}</p>{p.draft.paper.pmcid && <a href={`https://pmc.ncbi.nlm.nih.gov/articles/${p.draft.paper.pmcid}/`} target="_blank" rel="noreferrer">Open full-text source ↗</a>}<p>{p.draft.paper.journal} · {p.draft.paper.year} · PMID {p.draft.paper.pmid || 'not available'} · DOI {p.draft.paper.doi || 'not available'}</p><p>{p.draft.paper.full_text_available ? 'Full text available' : 'Abstract only'} · {p.draft.paper.full_text_used ? 'Abstract + full-text methods used' : 'Abstract metadata used'} · {p.draft.paper.metadata_provider} · retrieved {p.draft.paper.retrieved_at}</p></div>}
  {p.draft?.warnings?.map((w, i) => <p className="rw-notice" key={i}>{w}</p>)}
  {recognized > 0 && <><p className="rw-question"><strong>Research question</strong><br />{p.definition.exposure || 'Which exposure'} → {p.definition.outcome || 'which outcome'}{p.definition.population ? ` in ${p.definition.population}` : ''}?</p><dl className="rw-summary-grid">{keys.filter(k => p.definition[k]).map(k => <div key={k}><dt>{labels[k]}</dt><dd>{p.definition[k]}<small>{p.draft?.definition?.[k] !== p.definition[k] ? 'Researcher provided / edited' : p.draft?.provenance?.[k]?.origin?.replaceAll('_', ' ') || 'Researcher provided'}</small></dd></div>)}</dl>{!p.definition.comparator && <p className="rw-input-note">{labels.comparator}: not yet specified. Review this before comparing numerical estimates.</p>}<p className="rw-input-note">The primary outcome and reference group need your approval. A proposed endpoint is not a claim that the authors designated it as primary.</p></>}
- {missing.length > 0 && !editing && <div className="rw-clarify"><h4>Clarity needs {missing.length === 1 ? 'one detail' : `${missing.length} details`} before matching:</h4>{missing.map(k => <label key={k}>{k === 'outcome' ? 'Which outcome should be treated as primary?' : `What is the ${labels[k].toLowerCase()}?`}<input value={p.definition[k] || ''} onChange={e => onField(k, e.target.value)} maxLength={900} /></label>)}</div>}
- {editing && <div className="rw-fields">{keys.map(k => <label key={k}>{labels[k]}{['exposure', 'outcome'].includes(k) ? ' (required)' : ''}<input value={p.definition[k] || ''} onChange={e => onField(k, e.target.value)} maxLength={900} /></label>)}</div>}
+ {missing.length > 0 && !editing && <div className="rw-clarify"><h4>Clarity needs {missing.length === 1 ? 'one detail' : `${missing.length} details`} before matching:</h4>{missing.map(k => <label key={k}>{k === 'outcome' ? 'Which outcome should be treated as primary?' : `What is the ${labels[k].toLowerCase()}?`}<input value={p.definition[k] || ''} onChange={e => editField(k, e.target.value)} maxLength={900} /></label>)}</div>}
+ {editing && <div className="rw-fields">{keys.map(k => <label key={k}>{labels[k]}{['exposure', 'outcome'].includes(k) ? ' (required)' : ''}<input value={p.definition[k] || ''} onChange={e => editField(k, e.target.value)} maxLength={900} /></label>)}</div>}
  <details><summary>Measurement details & source passages</summary><dl className="rw-summary-grid">{Object.keys(FIELDS).filter(k => !keys.includes(k) && p.definition[k]).map(k => <div key={k}><dt>{labels[k]}</dt><dd>{p.definition[k]}</dd></div>)}</dl>{Object.entries(p.draft?.provenance || {}).map(([k, v]) => <details key={k}><summary>{labels[k] || k} · {v.origin.replaceAll('_', ' ')}</summary><blockquote>{v.quote}</blockquote><p>{v.source_id || 'Your pasted text'} · {v.kind}</p>{p.draft?.conflicts?.[k] && <p>Source value: {p.draft.conflicts[k].source_value}. Your explicit field takes precedence and requires review.</p>}{p.draft?.definition?.[k] !== p.definition[k] && <p>Researcher edit: {p.definition[k] || 'cleared'}. The passage above supports the original draft, not this edit.</p>}</details>)}</details>
- {editing && <details><summary>Advanced study details</summary><div className="rw-fields">{Object.entries(FIELDS).filter(([k]) => !keys.includes(k)).map(([k, label]) => <label key={k}>{labels[k] || label}<input value={p.definition[k] || ''} onChange={e => onField(k, e.target.value)} maxLength={900} /></label>)}</div></details>}
+ {editing && <details><summary>Advanced study details</summary><div className="rw-fields">{Object.entries(FIELDS).filter(([k]) => !keys.includes(k)).map(([k, label]) => <label key={k}>{labels[k] || label}<input value={p.definition[k] || ''} onChange={e => editField(k, e.target.value)} maxLength={900} /></label>)}</div></details>}
  <div className="rw-actions"><button className="rw-primary" disabled={busy || missing.length > 0} onClick={onConfirm}>Looks right — continue</button><button onClick={() => setEditing(v => !v)}>{editing ? 'Finish editing' : 'Edit'}</button></div></section>}
  </>;
 }
