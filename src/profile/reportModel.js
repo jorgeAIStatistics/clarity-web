@@ -7,7 +7,7 @@ export const labels = {
   rate_ratio: 'Rate ratio',
   mean_diff: 'Mean difference',
   smd: 'SMD',
-  risk_diff: 'Risk difference'
+  risk_diff: 'Risk difference', partial_eta_squared: 'Partial η²'
 };
 const metricOf = m => ({
   'hazard ratio': 'hr',
@@ -16,21 +16,24 @@ const metricOf = m => ({
   'odds ratio': 'or',
   'mean difference': 'mean_diff',
   'standardized mean difference': 'smd',
-  'rate ratio': 'rate_ratio'
+  'rate ratio': 'rate_ratio', 'partial eta squared': 'partial_eta_squared'
 })[m?.toLowerCase()] || m;
 export const ratio = m => ['hr', 'rr', 'or', 'rate_ratio'].includes(m);
+export function validPoint(e) {return Boolean(e && labels[e.metric] && typeof e.estimate === 'number' && Number.isFinite(e.estimate) && (!ratio(e.metric) || e.estimate > 0));}
+export function intervalText(e) {return validEstimate(e) ? `${e.interval_level ? e.interval_level+'% ' : ''}CI ${e.lower}–${e.upper}` : 'Interval not reported';}
 export function validEstimate(e) {
   return e && Boolean(labels[e.metric]) && [e.estimate, e.lower, e.upper].every(x => typeof x === 'number' && Number.isFinite(x)) && e.lower <= e.estimate && e.estimate <= e.upper && (!ratio(e.metric) || e.lower > 0);
 }
 export function magnitude(e) {
-  return validEstimate(e) ? `${labels[e.metric] || e.measure || 'Estimate'} ${e.estimate}${!ratio(e.metric) && e.unit ? ' ' + e.unit : ''}` : 'Magnitude awaiting validation';
+  return validPoint(e) ? `${labels[e.metric] || e.measure || 'Estimate'} ${e.estimate}${!ratio(e.metric) && e.metric!=='partial_eta_squared' && e.unit ? ' ' + e.unit : ''}` : 'Magnitude awaiting validation';
 }
 export function precision(e) {
-  if (!validEstimate(e)) return 'No validated interval is available; study volume cannot determine magnitude.';
+  if (!validEstimate(e)) return validPoint(e) ? 'The source reports a point estimate without a confidence interval. Precision cannot be inferred from its p-value.' : 'No validated interval is available; study volume cannot determine magnitude.';
   const n = ratio(e.metric) ? 1 : 0;
-  return e.lower <= n && e.upper >= n ? `The interval includes ${n} (no difference). Effects on either side remain compatible with these data; benefit and equivalence are not established.` : `The interval lies ${e.lower > n ? 'above' : 'below'} ${n}. Clinical importance depends on the endpoint, population and comparison.`;
+  if(e.lower===n || e.upper===n)return `The interval reaches ${n} (no difference). This boundary result does not establish equivalence.`;
+  return e.lower < n && e.upper > n ? `The interval includes ${n} (no difference). Effects on either side remain compatible with these data; benefit and equivalence are not established.` : `The interval lies ${e.lower > n ? 'above' : 'below'} ${n}. Clinical importance depends on the endpoint, population and comparison.`;
 }
-export const direction = e => !validEstimate(e) ? 'Unresolved' : e.lower <= (ratio(e.metric) ? 1 : 0) && e.upper >= (ratio(e.metric) ? 1 : 0) ? 'Direction uncertain' : e.estimate > (ratio(e.metric) ? 1 : 0) ? 'Higher measured outcome' : 'Lower measured outcome';
+export const direction = e => e?.metric==='partial_eta_squared' ? 'Non-directional effect size' : !validEstimate(e) ? 'Unresolved' : e.lower <= (ratio(e.metric) ? 1 : 0) && e.upper >= (ratio(e.metric) ? 1 : 0) ? 'Direction uncertain' : e.estimate > (ratio(e.metric) ? 1 : 0) ? 'Higher measured outcome' : 'Lower measured outcome';
 export function buildReport(model, overlay, context) {
   const map = new Map(),
     get = name => {
@@ -72,7 +75,7 @@ export function buildReport(model, overlay, context) {
       instrument: s.instrument || UNKNOWN,
       timepoint: s.timepoint || s.duration || UNKNOWN,
       rob: UNKNOWN,
-      effect: validEstimate(e) && f.effect.origin === 'reported' && f.quote && s.abstract?.slice(f.source_span?.start, f.source_span?.end) === f.quote ? e : null,
+      effect: validPoint(e) && ((e.lower == null && e.upper == null) || validEstimate(e)) && f.effect.origin === 'reported' && f.quote && s.abstract?.slice(f.source_span?.start, f.source_span?.end) === f.quote ? e : null,
       quote: f.quote,
       span: f.source_span,
       review: s.review_status || 'automated_appraisal',

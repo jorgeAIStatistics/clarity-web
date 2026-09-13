@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { buildReport, filterRows, magnitude, precision, direction, scale, sortRows, UNKNOWN } from './reportModel.js';
+import { buildReport, filterRows, magnitude, precision, direction, scale, sortRows, UNKNOWN, validEstimate, intervalText } from './reportModel.js';
 import { safeSource } from '../platform/profileModel.js';
 import LivingResearch from '../evidence/LivingResearch.jsx';
 import './report.css';
@@ -30,6 +30,7 @@ function Interval({
 }) {
   const e = row.effect;
   if (!e) return null;
+  if (!validEstimate(e)) return <figure className="ar-interval"><figcaption><button onClick={()=>onSource(row.key)}>PMID {row.id} · inspect source ↗</button><strong>{magnitude(e)}</strong></figcaption><p>{intervalText(e)}. No interval chart is drawn.</p><p>{precision(e)}</p><p>{row.population} · {row.design}</p></figure>;
   const {
     x,
     nullValue
@@ -134,7 +135,7 @@ export default function AnalyticalProfile({
       })} />
  {!data && !error && <p role="status">Loading source-validated findings…</p>}{error && <p role="alert">Selected source enrichment could not load. Cached records remain available in Audit. <button onClick={() => location.reload()}>Retry</button></p>}
  <h2>{answer ? answer.conclusion || `${selected.name}: ${direction(answer.effect).toLowerCase()} in the selected ${answer.layer === 'synthesis' ? 'review' : 'study'}.` : 'The retained evidence needs endpoint-level appraisal before a magnitude can be stated.'}</h2>
- <div className="ar-answer-grid"><div className="ar-main-estimate"><span className="ar-label">OBSERVED MAGNITUDE · SELECTED SOURCE</span><strong>{magnitude(answer?.effect)}</strong>{answer && <><span>{answer.effect.interval_level ? `${answer.effect.interval_level}% ` : ''}CI {answer.effect.lower}–{answer.effect.upper}</span><button className="ar-source" onClick={() => jump(answer.key)}>PMID {answer.id} · inspect passage ↗</button></>}<p>{precision(answer?.effect)}</p></div><div><span className="ar-label">CERTAINTY · SEPARATE FROM MAGNITUDE</span><p className="ar-grade">{selected.grade ? `${selected.grade} · existing automated rating` : 'Outcome appraisal pending'}</p><p>{selected.grade ? 'This cached topic rating has not been validated for the exact estimate or filtered population. It is not a formal domain-based certainty assessment.' : 'A traceable estimate does not by itself establish certainty.'}</p><span className="ar-label">STUDIED POPULATION</span><p>{answer?.population || 'Population context awaits structured extraction.'}</p></div></div>
+ <div className="ar-answer-grid"><div className="ar-main-estimate"><span className="ar-label">OBSERVED MAGNITUDE · SELECTED SOURCE</span><strong>{magnitude(answer?.effect)}</strong>{answer && <><span>{intervalText(answer.effect)}</span><button className="ar-source" onClick={() => jump(answer.key)}>PMID {answer.id} · inspect passage ↗</button></>}<p>{precision(answer?.effect)}</p></div><div><span className="ar-label">CERTAINTY · SEPARATE FROM MAGNITUDE</span><p className="ar-grade">{selected.grade ? `${selected.grade} · existing automated rating` : 'Outcome appraisal pending'}</p><p>{selected.grade ? 'This cached topic rating has not been validated for the exact estimate or filtered population. It is not a formal domain-based certainty assessment.' : 'A traceable estimate does not by itself establish certainty.'}</p><span className="ar-label">STUDIED POPULATION</span><p>{answer?.population || 'Population context awaits structured extraction.'}</p></div></div>
  <div className="ar-caveat"><strong>Main limitation</strong><p>{caveat}</p></div>
  <div className="ar-actions"><a href={`/explore/matcher?evidence=${encodeURIComponent(model.name)}&outcome=${encodeURIComponent(selected.name)}`}>Use this evidence in my research ↗</a><a href={`/explore/matcher?evidence=${encodeURIComponent(model.name)}&outcome=${encodeURIComponent(selected.name)}`}>Compare with my study ↗</a></div></section>
  <section id="ar-1"><p className="hp-eyebrow">02 / LANDSCAPE</p><h2>Which outcomes have an interpretable estimate?</h2><p>Exact endpoints are separate from broader topic appraisals. Magnitudes use their original measures; no cross-outcome ranking is implied.</p><div className="ar-landscape">{outcomes.map(o => {
@@ -181,7 +182,7 @@ export default function AnalyticalProfile({
         }).map(([k, v]) => <details key={k}><summary>{k}</summary><p>{v}</p></details>)}</div><aside className="ar-needed"><span className="ar-label">WHAT EVIDENCE IS STILL NEEDED?</span><p>{needed}</p></aside>
  <div id="ar-matrix"><h2>Study characteristics & research matrix</h2><p>Colored cells identify available fields, not study quality. Read population and methods before interpreting differences between estimates.</p><Chips label="Matrix column preset" values={['Characteristics', 'Overview', 'Methods', 'Results', 'Population', 'Audit']} value={preset} onChange={setPreset} /><label className="ar-sort">Order by <select value={order} onChange={e => setOrder(e.target.value)}><option value="date">Date</option><option value="population">Population</option><option value="effect">Effect (within measure and units)</option><option value="directness">Context availability (directness proxy)</option></select></label><div className="ar-table-scroll"><table><caption>{selected.name} · {preset} · {ordered.length} records</caption><thead><tr><th>Study / source</th>{(preset === 'Characteristics' ? ['Effect', 'Population', 'Baseline', 'Dose', 'Duration', 'Design', 'Instrument', 'Timepoint', 'Risk of bias'] : preset === 'Overview' ? ['Effect', 'Population', 'Design'] : preset === 'Methods' ? ['Dose', 'Duration', 'Design', 'Instrument', 'Risk of bias'] : preset === 'Results' ? ['Effect', 'Endpoint', 'Timepoint'] : preset === 'Population' ? ['Population', 'Baseline', 'Dose'] : ['Review', 'Provenance']).map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{ordered.map(r => {
                 const values = {
-                  'Effect': r.effect ? `${magnitude(r.effect)}; CI ${r.effect.lower}–${r.effect.upper}` : UNKNOWN,
+                  'Effect': r.effect ? `${magnitude(r.effect)}; ${intervalText(r.effect)}` : UNKNOWN,
                   'Population': r.population,
                   'Design': r.design,
                   'Dose': r.dose,

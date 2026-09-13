@@ -114,3 +114,5 @@ test('a modified quote cannot enter the numerical report', () => {
   const r = buildReport({}, null, bad);
   assert.equal(r[0].rows[0].effect, null);
 });
+test('point-only findings retain their population without fabricating an interval',()=>{const sources=JSON.parse(fs.readFileSync(new URL('../../public/intervention-enrichment.json',import.meta.url)));const r=buildReport({},sources.profiles.creatine);const e=r[0].rows[0].effect;assert.match(magnitude(e),/Partial η² 0.029/);assert.equal(validEstimate(e),false);assert.match(precision(e),/without a confidence interval/);assert.match(r[0].rows[0].population,/123/);});
+test('an interval touching the null is not described as crossing both sides',()=>{assert.match(precision({metric:'rr',estimate:.8,lower:.6,upper:1}),/boundary/);});
