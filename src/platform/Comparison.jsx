@@ -1,116 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { API_BASE } from './api.js';
+import React,{useEffect,useMemo,useState} from 'react';
+import {ArrowUpRight} from 'lucide-react';
+import {loadVisualSnapshot} from '../profile/useVisualReport.js';
+import useVisualReport from '../profile/useVisualReport.js';
+import {prepareReport,options} from '../profile/visualModel.js';
+import {EffectChart,SourceInspector} from '../profile/VisualProfile.jsx';
+import '../profile/visual.css';
+function pathFor(id){const [type,slug]=id.split(':');if(type==='compound')return '/compound/'+slug;const e=catalog.entities.find(e=>e.id===slug);return e?entityPath(e):'/explore';}
 import catalog from '../evidence/catalog.json';
-import { compoundBrief, entityBrief, studyLayer, safeSource } from './profileModel.js';
-import '../research/workspace.css';
-const canonical = s => String(s).toLowerCase().replace(/\s*[—–].*$/, '').trim();
-function useProfile(option) {
-  const [state, setState] = useState({});
-  useEffect(() => {
-    if (!option) return;
-    if (option.entity) {
-      setState({
-        id: option.id,
-        model: entityBrief(option.entity)
-      });
-      return;
-    }
-    const c = new AbortController(),
-      timer = setTimeout(() => {setState({id:option.id,error:true});c.abort();}, 20000);
-    setState({});
-    fetch(`${API_BASE}/api/profile?topic=${encodeURIComponent(option.name)}&category=${encodeURIComponent(option.category || 'supplement')}`, {
-      signal: c.signal
-    }).then(r => {
-      if (!r.ok) throw Error();
-      return r.json();
-    }).then(({
-      profile: p
-    }) => setState({
-      id: option.id,
-      model: compoundBrief({
-        analysis: p.analysis,
-        name: p.name,
-        bestTier: p.best_tier,
-        tier: p.tier,
-        generatedAt: p.generated_at,
-        studyCount: p.study_count,
-        outcomes: (p.claims || []).map(x => ({
-          outcome: x.outcome,
-          tier: x.tier,
-          studies: x.studies || [],
-          headlineEffect: x.headline_effect ? {
-            ...x.headline_effect,
-            ciLow: x.headline_effect.ci_low,
-            ciHigh: x.headline_effect.ci_high,
-            estimated: x.headline_effect.ci_estimated
-          } : null
-        }))
-      })
-    })).catch(() => {
-      if (!c.signal.aborted) setState({
-        id: option.id,
-        error: true
-      });
-    }).finally(() => clearTimeout(timer));
-    return () => {
-      clearTimeout(timer);
-      c.abort();
-    };
-  }, [option]);
-  return state.id === option?.id ? state : {};
-}
-export default function Comparison() {
-  const [compounds, setCompounds] = useState([]),
-    [a, setA] = useState('apob'),
-    [b, setB] = useState('ldl-c'),
-    [all, setAll] = useState(false),
-    [outcome, setOutcome] = useState(''),
-    [project, setProject] = useState(null);
-  useEffect(() => {
-    const c = new AbortController();
-    fetch('/library.json', {
-      signal: c.signal
-    }).then(r => r.json()).then(d => setCompounds(d.entries.filter(x => x.entity_type === 'intervention'))).catch(() => {});
-    return () => c.abort();
-  }, []);
-  const options = useMemo(() => [...catalog.entities.map(e => ({
-      id: e.id,
-      name: e.name,
-      entity: e
-    })), ...compounds], [compounds]),
-    left = useProfile(options.find(x => x.id === a)),
-    right = useProfile(options.find(x => x.id === b)),
-    models = [left.model, right.model];
-  const names = models.map(m => [...new Set((m?.outcomes || []).map(o => canonical(o.name)))]),
-    common = names[0].filter(x => names[1].includes(x)),
-    available = all ? [...new Set(names.flat())] : common,
-    chosen = available.includes(outcome) ? outcome : available[0] || '',
-    rows = models.map(m => (m?.outcomes || []).filter(o => canonical(o.name) === chosen));
-  const value = (i, key) => {
-    const m = models[i],
-      o = rows[i];
-    if (!m) return 'Loading / unavailable';
-    if (key === 'Bottom line') return m.summary;
-    if (key === 'Outcome') return chosen || 'No shared outcome';
-    if (key === 'Certainty') return [...new Set(o.map(x => x.grade))].filter(x => x && !/appraisal|pending/i.test(x)).join(' · ') || 'Certainty not appraised; extraction status is separate';
-    if (key === 'Effect magnitude') return o.some(x => x.effectQuote) ? <details><summary>{o.filter(x => x.effectQuote).length} source-specific findings; no combined magnitude</summary>{o.filter(x => x.effectQuote).map((x, j) => <div key={x.key || j}><p>{x.effect}</p><small>{x.exposure} · {x.comparator}</small><a href={safeSource(x.effectSource)} target="_blank" rel="noreferrer">Inspect original source ↗</a></div>)}</details> : 'Effect magnitude not reliably extractable';
-    if (key === 'Population') return [...new Set(o.map(x => x.population))].filter(Boolean).join(' | ') || 'Not extracted';
-    if (key === 'Human trials') return m.studies.filter(s => studyLayer(s) === 'interventional').length + ' classified records; not a quality score';
-    if (key === 'Syntheses') return m.studies.filter(s => studyLayer(s) === 'synthesis').length + ' records; participant overlap possible';
-    if (key === 'Main limitation') return m.limitations[0];
-    return 'Not appraised in a comparable structured field';
-  };
-  return <div className="research-workspace"><p>Compare one scientific question across aligned evidence bodies. Certainty and magnitude remain separate.</p><div className="rw-fields">{[[a, setA, 'Evidence A'], [b, setB, 'Evidence B']].map(([v, set, label]) => <label key={label}>{label}<select value={v} onChange={e => set(e.target.value)}>{options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>)}</div><section className="rw-panel">{(left.error||right.error)&&<p role="status">A selected profile could not be loaded. Choose another profile or retry later.</p>}<h2>What outcome are you comparing?</h2><label className="rw-check"><input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)} />Show all outcomes (default: common outcomes)</label><label>Outcome<select value={chosen} onChange={e => setOutcome(e.target.value)}>{!available.length && <option value="">No shared outcome identified</option>}{available.map(x => <option key={x}>{x}</option>)}</select></label>{models.every(Boolean) && !common.length && <p className="rw-notice">These profiles do not answer the same primary scientific question. Their overall grades should not be interpreted as one being better.</p>}<p>Shared outcome labels do not establish comparable exposures, populations or estimands.</p><p>Direct head-to-head status has not been appraised. Shared citations do not prove a direct comparison; this view uses separate evidence bodies.</p><label>Add my saved study<select value={project?.id || ''} onChange={e => {
-          try {
-            setProject(JSON.parse(localStorage.getItem('clarity-research-projects-v1') || '[]').find(x => x.id === e.target.value) || null);
-          } catch {
-            setProject(null);
-          }
-        }}><option value="">No study column</option>{(() => {
-            try {
-              return JSON.parse(localStorage.getItem('clarity-research-projects-v1') || '[]').map(p => <option key={p.id} value={p.id}>{p.title}</option>);
-            } catch {
-              return [];
-            }
-          })()}</select></label><div className="rw-scroll"><table className="rw-table"><thead><tr><th>Scientific dimension</th><th>{models[0]?.name || 'Evidence A'}</th><th>{models[1]?.name || 'Evidence B'}</th>{project && <th>MY STUDY · USER PROVIDED</th>}</tr></thead><tbody>{['Bottom line', 'Outcome', 'Certainty', 'Effect magnitude', 'Population', 'Human trials', 'Syntheses', 'Directness', 'Duration', 'Safety', 'Risk of bias', 'Main limitation'].map(key => <tr key={key}><th>{key}</th>{[0, 1].map(i => <td key={i}>{value(i, key)}</td>)}{project && <td>{key === 'Bottom line' ? project.text : key === 'Outcome' ? project.definition.outcome : key === 'Population' ? project.definition.population : key === 'Duration' ? project.definition.duration : key === 'Effect magnitude' ? `${project.userResult.metric}: ${project.userResult.estimate || 'Not entered'}${project.userResult.lower && project.userResult.upper ? ` (${project.userResult.confidence_level}% CI ${project.userResult.lower}–${project.userResult.upper})` : ''}` : 'Not independently appraised'}</td>}</tr>)}</tbody></table></div></section><details className="rw-panel"><summary>Audit / data coverage</summary>{models.map((m, i) => <p key={i}>{m?.name}: {m?.studies.length || 0} linked publications; {m?.outcomes.filter(o => o.effectQuote).length || 0} traceable finding rows. These counts do not measure certainty.</p>)}<p>Common outcomes use normalized labels, not a validated harmonization of estimands. Inspect population, comparator and time horizon in the original reports.</p></details><a href="/explore/matcher">Compare individual studies in the research workspace →</a></div>;
+import {entityPath} from '../evidence/routing.js';
+export default function Comparison(){
+ const first=new URLSearchParams(location.search).get('profile')||'entity:apob';
+ const [ids,setIds]=useState([first,first==='entity:ldl-c'?'entity:apob':'entity:ldl-c','','']);
+ const [snapshot,setSnapshot]=useState(null),[outcome,setOutcome]=useState(''),[mode,setMode]=useState(''),[aligned,setAligned]=useState(false),[source,setSource]=useState(null),[active,setActive]=useState('');
+ useEffect(()=>{let live=true;loadVisualSnapshot().then(d=>{if(live)setSnapshot(d);}).catch(()=>{});return()=>{live=false;};},[]);
+ const a=useVisualReport(ids[0]),b=useVisualReport(ids[1]),c=useVisualReport(ids[2]),d=useVisualReport(ids[3]);
+ const reports=useMemo(()=>[a,b,c,d].map((state,i)=>ids[i]?prepareReport(state.report||snapshot?.profiles[ids[i]],{name:snapshot?.profiles[ids[i]]?.name,targetId:ids[i]}):null).filter(Boolean),[a.report,b.report,c.report,d.report,snapshot,ids]);
+ const outcomes=options(reports.flatMap(r=>r.records),'outcome'),chosen=outcomes.includes(outcome)?outcome:outcomes[0]||'';
+ const modes=options(reports.flatMap(r=>r.records).filter(r=>r.outcome===chosen),'mode'),question=modes.includes(mode)?mode:modes[0]||'';
+ const entries=reports.map(p=>({...p,rows:p.records.filter(r=>r.outcome===chosen&&r.mode===question)}));
+ const contextProfiles=new Map();for(const p of entries)for(const row of p.rows){const set=contextProfiles.get(row.compatibilityKey)||new Set();set.add(p.id);contextProfiles.set(row.compatibilityKey,set);}
+ const selections=Object.entries(snapshot?.profiles||{}).map(([id,p])=>({id,name:p.name})).sort((a,b)=>a.name.localeCompare(b.name));
+ return <div className="vx-report"><div className="vx-compare-select">{ids.map((id,i)=><label key={i}>Profile {i+1}{i>1?' (optional)':''}<select value={id} onChange={e=>{setIds(ids.map((v,j)=>i===j?e.target.value:v));setActive('');}}>{i>1&&<option value="">No additional profile</option>}{!selections.length&&<option value={id}>Loading source set</option>}{selections.map(o=><option value={o.id} key={o.id} disabled={ids.includes(o.id)&&id!==o.id}>{o.name}</option>)}</select></label>)}</div><div className="vx-compare-controls"><label>Outcome<select value={chosen} onChange={e=>{setOutcome(e.target.value);setMode('');}}>{outcomes.length?outcomes.map(o=><option key={o}>{o}</option>):<option value="">No quantitative outcome in this selection</option>}</select></label><label>Scientific question<select value={question} onChange={e=>setMode(e.target.value)}>{modes.map(o=><option key={o}>{o}</option>)}</select></label><label><input type="checkbox" checked={aligned} onChange={e=>setAligned(e.target.checked)}/>Matching source contexts only</label></div><p className="vx-caption">Separate source-specific contrasts; each panel has its own labeled scale. Bands show reported confidence intervals, not uncertainty for a difference between profiles. Shared studies are not independent replications.</p><div className="vx-compare-panels">{entries.map(p=>{const rows=aligned?p.rows.filter(r=>contextProfiles.get(r.compatibilityKey)?.size>1):p.rows;return <section key={p.id}><span className="vx-eyebrow">{p.id.startsWith('compound:')?'INTERVENTION':'HEALTH EVIDENCE'}</span><h2>{p.name}</h2><EffectChart rows={rows} onSelect={setActive} selectedId={active} onInspect={setSource} band/><a href={pathFor(p.id)}>Open full profile <ArrowUpRight size={14}/></a></section>;})}</div><details className="vx-source-library"><summary>Alignment & export</summary><p>Matching source contexts require identical recorded outcome, measure, units, population, exposure, reference and available timepoint fields. Matching wording does not establish scientific equivalence. No automatic treatment ranking is performed.</p><button onClick={()=>{const blob=new Blob([JSON.stringify({version:'visual-comparison-v1',selection:{ids,outcome:chosen,mode:question,aligned},profiles:entries.map(p=>({...p,rows:aligned?p.rows.filter(r=>contextProfiles.get(r.compatibilityKey)?.size>1):p.rows}))},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='clarity-comparison.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>Export this source comparison</button></details><SourceInspector record={source} onClose={()=>setSource(null)}/></div>;
 }

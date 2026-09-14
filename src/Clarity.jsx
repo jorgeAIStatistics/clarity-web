@@ -4,7 +4,7 @@ import Library from "./platform/Library.jsx";
 import {API_BASE} from "./platform/api.js";
 import PlatformMethodology from "./platform/PlatformMethodology.jsx";
 import PlatformHome from "./platform/PlatformHome.jsx";
-import AnalyticalProfile from "./profile/AnalyticalProfile.jsx";
+import VisualProfile from "./profile/VisualProfile.jsx";
 import {compoundBrief} from "./platform/profileModel.js";
 import {withTransition, transitionView, animateDisclosure} from "./motion/navigation.js";
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -2357,15 +2357,8 @@ function MethodologyPage({ onBack }) {
 }
 
 function ProfileView({view,onLearn}) {
-  if(!view)return null;
-  return <div className="profile-workspace" style={{paddingBottom:70}}>
-    <AnalyticalProfile key={view.name} model={compoundBrief(view)}><details><summary>Molecular context and source questions</summary>
-    <section className="molecular-context" id="molecular-context"><p className="hp-eyebrow">BIOLOGY & DISPOSITION</p><h2>Molecular identity and pharmacokinetics</h2><p className="analysis-note">Structure, absorption, and exposure help explain the research question. They do not establish a clinical benefit. Values below retain their available source context.</p>
-      <ChemistryBlock chem={view.chemistry}/><PharmacokineticsBlock pk={view.pharmacokinetics}/>
-      {!view.chemistry&&!view.pharmacokinetics&&<p className="analysis-note">No sourced molecular or pharmacokinetic record has been curated for this profile.</p>}
-    </section>
-    <section id="ask-evidence"><h2>Ask a question about these studies</h2><p className="analysis-note">Answers use the graded profile and retrieved study records. Inspect the cited evidence, especially where quantitative extraction is incomplete.</p><AskClarity topic={view.name} category={view.cat} compoundName={view.name} outcomes={view.outcomes}/></section></details></AnalyticalProfile>
-  </div>;
+ if(!view)return null;
+ return <div className="profile-workspace" style={{paddingBottom:70}}><VisualProfile key={view.name} model={compoundBrief(view)} chemistry={view.chemistry}/></div>;
 }
 
 // Expandable study card

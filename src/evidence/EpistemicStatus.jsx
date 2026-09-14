@@ -11,8 +11,7 @@ export default function EpistemicStatus({ status, children, title }) {
 }
 
 export function ReviewStatus({ reviewStatus }) {
-  const { status, label } = reviewEpistemic(reviewStatus);
-  return <EpistemicStatus status={status}>{label}</EpistemicStatus>;
+  return <span className="es-chip es-neutral">{reviewStatus==='reference_summary'?'Reference context':'Source records'}</span>;
 }
 
 export function OutcomeCertainty({ gradeStatus, legacyGrade }) {

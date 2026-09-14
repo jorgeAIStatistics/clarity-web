@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {validRecord,rowsFor,panelsFor,axisFor} from './visualModel.js';
+const profiles=JSON.parse(fs.readFileSync(new URL('../../public/visual-evidence.json',import.meta.url))).profiles;
+const report=profiles['entity:ldl-c'];
+test('all bundled plotted records pass the browser contract',()=>{for(const p of Object.values(profiles))for(const r of p.records)assert.ok(validRecord(r),r.id);});
+test('reject corrupted source, numeric strings and incomplete intervals',()=>{const r=report.records[0];for(const patch of [{point:'0.5'},{sourceText:'changed'},{lower:null,upper:1},{scale:'log',point:0},{span:{start:0,end:1}}])assert.equal(validRecord({...r,...patch}),false);});
+test('filters separate association from intervention outcomes',()=>{const rows=rowsFor(report,{mode:'Association'});assert.ok(rows.length);assert.ok(rows.every(r=>r.mode==='Association'));});
+test('different metrics retain independent axes',()=>{const groups=panelsFor(report.records);assert.ok(groups.length>1);for(const group of groups)assert.ok(group.records.every(r=>r.metric===group.metric));});
+test('log axis is monotonic and centers multiplicative intervals',()=>{const a=axisFor([{point:1,lower:.5,upper:2}],'log',1);assert.ok(a.x(.5)<a.x(1));assert.ok(Math.abs((a.x(.5)+a.x(2))/2-a.x(1))<1e-8);});
