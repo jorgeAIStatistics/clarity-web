@@ -1,15 +1,15 @@
+import LAYER_RULES from './layers.generated.js';
 export const LAYERS=[['mechanism','Mechanism / biology'],['preclinical','Preclinical / animal'],['observational','Human observational'],['interventional','Human interventional'],['guidelines','Guidelines / regulation']];
+// Evidence layers come from the engine's versioned rule table (clarity-engine/evidence/layers.json).
+function compileCondition(c){return c.flag?{flag:c.flag}:{field:c.field,re:new RegExp(c.pattern)};}
+const LAYER_RULE_SET=LAYER_RULES.rules.map(r=>({layer:r.layer,any:r.any?.map(compileCondition),none:r.none?.map(compileCondition)}));
+const layerField=(s,name)=>name==='population_design'?`${layerField(s,'population')} ${layerField(s,'design')}`:String((name==='design'?(s.design||s.study_type):s[name])||'').toLowerCase();
+const conditionMatches=(s,c)=>c.flag?Boolean(s[c.flag]):c.re.test(layerField(s,c.field));
 export function studyLayer(s){
-  const design=String(s.design||s.study_type||'').toLowerCase(),population=String(s.population||'').toLowerCase();
-  if(s.is_protocol||/\b(study protocol|trial protocol|protocol for (a|an|the) .{0,40}trial)\b/.test(String(s.title||'').toLowerCase())||design.includes('protocol'))return 'protocol';
-  if(/guideline|practice recommendation|regulatory/.test(design))return 'guidelines';
-  if(/animal|mouse|mice|rat\b|preclinical/.test(population)||/animal/.test(design))return 'preclinical';
-  if(/in.?vitro|cell[- ](?:line|culture|based)|mechanis/.test(population+' '+design))return 'mechanism';
-  if(/meta.analysis|systematic review/.test(design))return 'synthesis';
-  if(!/human/.test(population))return 'unclassified';
-  if(/random|rct|clinical trial|intervention/.test(design))return 'interventional';
-  if(/observ|cohort|case.control|cross.section/.test(design))return 'observational';
-  return 'unclassified';
+  for(const rule of LAYER_RULE_SET){
+    if(rule.any?rule.any.some(c=>conditionMatches(s,c)):!rule.none.some(c=>conditionMatches(s,c)))return rule.layer;
+  }
+  return LAYER_RULES.default;
 }
 export function safeSource(url){try{return new URL(url).protocol==='https:'?url:undefined;}catch{return undefined;}}
 export function uniqueStudies(outcomes){const result=new Map();for(const o of outcomes)for(const s of o.studies||[]){const id=s.pmid?`pmid:${s.pmid}`:s.doi?`doi:${s.doi.toLowerCase()}`:s.id||s.url;if(id&&!result.has(id))result.set(id,{...s,id});}return [...result.values()];}

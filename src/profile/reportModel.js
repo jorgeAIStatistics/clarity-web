@@ -1,5 +1,22 @@
 import { studyLayer } from '../platform/profileModel.js';
 export const UNKNOWN = 'Not extracted';
+export const NOT_ASSESSED = 'Not assessed';
+// Engine span offsets are Unicode code points (Python str indices), not UTF-16 units.
+export function sliceCodePoints(text, start, end) {
+  return typeof text === 'string' && Number.isInteger(start) && Number.isInteger(end) ? Array.from(text).slice(start, end).join('') : undefined;
+}
+// Default outcome order. No human certainty assessments exist yet and most sample sizes are
+// unextracted, so outcomes rank by linked human interventional records, then human observational
+// records, then all linked records, then whether a validated estimate exists. Ties keep source order.
+// A single exploratory endpoint therefore never opens ahead of the main evidence body.
+const layerCount = (o, layer) => o.rows.filter(r => r.layer === layer).length;
+export function rankOutcomes(outcomes) {
+  const key = o => [layerCount(o, 'interventional'), layerCount(o, 'observational'), o.rows.length, o.rows.some(r => r.effect) ? 1 : 0];
+  return outcomes.map((o, i) => ({ o, i, k: key(o) })).sort((a, b) => {
+    for (let j = 0; j < a.k.length; j++) if (a.k[j] !== b.k[j]) return b.k[j] - a.k[j];
+    return a.i - b.i;
+  }).map(x => x.o);
+}
 export const labels = {
   hr: 'HR',
   rr: 'RR',
@@ -74,8 +91,8 @@ export function buildReport(model, overlay, context) {
       duration: s.duration || UNKNOWN,
       instrument: s.instrument || UNKNOWN,
       timepoint: s.timepoint || s.duration || UNKNOWN,
-      rob: UNKNOWN,
-      effect: validPoint(e) && ((e.lower == null && e.upper == null) || validEstimate(e)) && f.effect.origin === 'reported' && f.quote && s.abstract?.slice(f.source_span?.start, f.source_span?.end) === f.quote ? e : null,
+      rob: NOT_ASSESSED,
+      effect: validPoint(e) && ((e.lower == null && e.upper == null) || validEstimate(e)) && f.effect.origin === 'reported' && f.quote && sliceCodePoints(s.abstract, f.source_span?.start, f.source_span?.end) === f.quote ? e : null,
       quote: f.quote,
       span: f.source_span,
       review: s.review_status || 'automated_appraisal',
@@ -100,7 +117,7 @@ export function buildReport(model, overlay, context) {
       duration: UNKNOWN,
       instrument: UNKNOWN,
       timepoint: UNKNOWN,
-      rob: UNKNOWN,
+      rob: NOT_ASSESSED,
       review: 'automated_appraisal'
     });
   }
