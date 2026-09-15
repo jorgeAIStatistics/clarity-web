@@ -50,8 +50,17 @@ export default function GraphProfile({slug,go}){
   useEffect(()=>{
     let active=true;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
     setState({status:'loading'});
-    fetch(`${API_BASE}/api/evidence/graph/entity/biomarker:${encodeURIComponent(slug)}`,{signal:controller.signal})
-      .then(async r=>{if(!active)return;if(r.status===404)return setState({status:'missing'});if(!r.ok)throw Error(String(r.status));const data=await r.json();if(active)setState({status:'ready',data});})
+    // Variants and genes share the biomarker address space; a biomarker id wins when both exist.
+    const load=async()=>{
+      for(const prefix of ['biomarker','variant','gene']){
+        const r=await fetch(`${API_BASE}/api/evidence/graph/entity/${prefix}:${encodeURIComponent(slug)}`,{signal:controller.signal});
+        if(r.status===404)continue;
+        if(!r.ok)throw Error(String(r.status));
+        return r.json();
+      }
+      return null;
+    };
+    load().then(data=>{if(active)setState(data?{status:'ready',data}:{status:'missing'});})
       .catch(()=>{if(active)setState({status:'error'});})
       .finally(()=>clearTimeout(timer));
     return()=>{active=false;clearTimeout(timer);controller.abort();};
@@ -98,7 +107,7 @@ export default function GraphProfile({slug,go}){
 
     {related.length>0&&<section className="gp-section" aria-labelledby="gp-related">
       <div className="gp-section-head"><h2 id="gp-related">Molecular identity</h2><p className="ev-note">Genes, proteins and variants are separate entities. A finding about one is not attached to another.</p></div>
-      <ul className="gp-related">{related.map(r=><li key={r.edge+r.id}><span>{relationLabel(r)}</span>{r.id.startsWith('biomarker:')?<Link to={`/biomarkers/${r.id.split(':')[1]}`} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}<small>{r.kind}</small></li>)}</ul>
+      <ul className="gp-related">{related.map(r=><li key={r.edge+r.id}><span>{relationLabel(r)}</span>{/^(biomarker|variant):/.test(r.id)?<Link to={`/biomarkers/${r.id.split(':')[1]}`} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}<small>{r.kind}</small></li>)}</ul>
     </section>}
 
     {dead.length>0&&<details className="gp-dead"><summary>{dead.length} extraction {dead.length===1?'attempt':'attempts'} produced no typed finding</summary>
