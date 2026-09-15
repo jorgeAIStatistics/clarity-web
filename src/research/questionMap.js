@@ -230,3 +230,16 @@ export const referenceOnly = text => /^\s*(?:pmid:?\s*)?\d{6,9}\s*$/i.test(text 
 
 const LAYER_FILTER = { mechanism: '(in vitro[tiab] OR mechanism[tiab] OR cell line[tiab])', preclinical: '(animals[mh] NOT humans[mh])', observational: '(cohort studies[mh] OR case-control studies[mh] OR cross-sectional studies[mh])', interventional: 'randomized controlled trial[pt]', guidelines: '(guideline[pt] OR practice guideline[pt] OR consensus[tiab])' };
 export const pubmedSearch = (entity, layer) => `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(`"${entity}"[tiab] AND ${LAYER_FILTER[layer]}`)}`;
+
+export const BUSY_MESSAGE = 'Clarity’s evidence service is busy with other questions or briefly unreachable. Your question and table are still here; try again in about a minute.';
+// Transient server states become a retryable busy message; request problems keep the server's own explanation.
+export function mapFailure({ status = 0, data = null, error = null } = {}) {
+  if (error?.name === 'AbortError') return { retry: true, message: 'The evidence service took too long to respond. It may be busy or waking up; try again in about a minute.' };
+  if (error && !status) return { retry: true, message: BUSY_MESSAGE };
+  if ([429, 502, 503, 504].includes(status)) return { retry: true, message: status === 503 && data?.error && data.code !== 'busy' ? data.error : BUSY_MESSAGE };
+  return { retry: false, message: data?.error || 'The evidence map is unavailable. Try again shortly.' };
+}
+// Proxy error pages are HTML, not JSON.
+export async function readJson(response) {
+  try { return await response.json(); } catch { return null; }
+}

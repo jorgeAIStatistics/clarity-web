@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { DEMO, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, sameOutcome } from './questionMap.js';
+import { DEMO, BUSY_MESSAGE, mapFailure, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, sameOutcome } from './questionMap.js';
 import { readResultTable, parseEstimateCell, parseInterval } from './resultTable.js';
 
 const snapshot = JSON.parse(fs.readFileSync(new URL('../../public/visual-evidence.json', import.meta.url))).profiles;
@@ -116,4 +116,12 @@ test('retrieved papers with no resolved entity become one temporary row, not an 
   assert.ok(m.rows[0].temporary);
   assert.deepEqual(m.rows[0].cells.map(c => c.count), [0, 0, 1, 1, 0]);
   assert.equal(coverageMatrix({ entities: [], studies: [] }).rows.length, 0);
+});
+
+test('overload and network failures become a retryable busy message; request errors keep their explanation', () => {
+  for (const status of [429, 502, 504]) assert.deepEqual(mapFailure({ status }), { retry: true, message: BUSY_MESSAGE });
+  assert.deepEqual(mapFailure({ status: 503, data: { code: 'busy', error: 'The evidence map is busy.' } }), { retry: true, message: BUSY_MESSAGE });
+  assert.deepEqual(mapFailure({ error: new TypeError('Failed to fetch') }), { retry: true, message: BUSY_MESSAGE });
+  assert.match(mapFailure({ error: Object.assign(new Error('x'), { name: 'AbortError' }) }).message, /too long/);
+  assert.deepEqual(mapFailure({ status: 400, data: { error: 'Enter between 20 and 12,000 characters.' } }), { retry: false, message: 'Enter between 20 and 12,000 characters.' });
 });

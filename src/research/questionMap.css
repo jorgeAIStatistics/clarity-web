@@ -170,3 +170,5 @@
 
 .qm-limits{font-size:12.5px;color:#f0cf7a;margin:8px 0 0;max-width:95ch}
 .qm-interpret{font-size:13px;line-height:1.55;color:var(--qm-soft);margin:6px 0 0;max-width:95ch}
+.qm-error{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.qm-error p{margin:0;max-width:90ch}

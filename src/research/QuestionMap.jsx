@@ -10,7 +10,7 @@ import { loadVisualSnapshot } from '../profile/useVisualReport.js';
 import { axisFor } from '../profile/visualModel.js';
 import { LAYERS, BANDS, list } from '../profile/meaningModel.js';
 import { describeEffect, measureFamily, num } from '../evidence/measures.js';
-import { DEMO, MAP_VERSION, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount } from './questionMap.js';
+import { DEMO, MAP_VERSION, mapFailure, readJson, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount } from './questionMap.js';
 import { readResultTable, RESULT_ROLES } from './resultTable.js';
 import './questionMap.css';
 
@@ -220,22 +220,25 @@ export default function QuestionMap() {
       if (referenceOnly(body)) {
         setStatus({ phase: 'resolving' });
         const response = await fetch(`${API_BASE}/api/research/definition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: body }), signal: c.signal });
-        const draft = await response.json();
-        if (!response.ok || !(draft.paper?.title || draft.paper?.abstract)) throw Error(draft.error || 'That reference could not be resolved. Paste its title or abstract instead.');
+        const draft = await readJson(response) || {};
+        if (!response.ok) throw Object.assign(Error('request_failed'), { failure: mapFailure({ status: response.status, data: draft }) });
+        if (!(draft.paper?.title || draft.paper?.abstract)) throw Error(draft.error || 'That reference could not be resolved. Paste its title or abstract instead.');
         reference = { input: body, title: draft.paper.title || 'Resolved publication' };
         body = `${draft.paper.title || ''}\n${draft.paper.abstract || ''}`.trim();
       }
       if (body.length < 20) throw Error('Describe the research question in at least 20 characters.');
       setStatus({ phase: 'mapping' });
       const response = await fetch(`${API_BASE}/api/evidence/match`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: composeQuery(body, { edits: nextEdits, rows }), workspace: true }), signal: c.signal });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.error || 'The evidence map is unavailable. Try again shortly.');
+      const data = await readJson(response);
+      if (!response.ok || !data) throw Object.assign(Error('request_failed'), { failure: mapFailure({ status: response.ok ? 502 : response.status, data }) });
       if (controller.current !== c) return;
       setResult(data); setSubmitted(body); setResolved(reference); setOutcome(''); setDrill(null); setEditingQuestion(false);
       setStatus({ phase: 'ready' });
     } catch (error) {
       if (controller.current !== c) return;
-      setStatus({ phase: 'error', message: error.name === 'AbortError' ? 'The evidence service took too long to respond. It may be waking up; try again in a moment.' : error.message });
+      // A network failure (TypeError) is how browsers report an overloaded proxy without CORS headers.
+      const failure = error.failure || (['AbortError', 'TypeError'].includes(error.name) ? mapFailure({ error }) : { retry: false, message: error.message });
+      setStatus({ phase: 'error', message: failure.message, retry: failure.retry ? { text, nextEdits, rows } : null });
     } finally { clearTimeout(timer); }
   }
 
@@ -287,7 +290,7 @@ export default function QuestionMap() {
       </form>}
     </section>
 
-    {status.phase === 'error' && <p role="alert" className="qm-error">{status.message}</p>}
+    {status.phase === 'error' && <div role="alert" className="qm-error"><p>{status.message}</p>{status.retry && <button type="button" className="qm-button" onClick={() => run(status.retry)}>Try again</button>}</div>}
     {busy && <div className="qm-skeleton" role="status" aria-busy="true"><p>{status.phase === 'resolving' ? 'Resolving the reference…' : 'Mapping your question across the evidence layers…'}</p><div><i /><i /><i /><i /></div></div>}
     {!ready && !busy && <div className="qm-preview" aria-label="What the map shows">
       {[['A', 'Intent', 'Association, clinical utility, mechanism and guidance, kept apart.'], ['B', 'Coverage heatmap', 'Your concepts against the five evidence layers, with gaps as first-class cells.'], ['C', 'Outcome landscape', 'Published estimates for one outcome, with your own result placed on the same scale.'], ['D–E', 'Tensions and next step', 'Where the layers stop short, and one research design that would answer it.']].map(([letter, title, text]) => <div key={letter}><span className="qm-letter">{letter}</span><strong>{title}</strong><p>{text}</p></div>)}
