@@ -118,3 +118,21 @@ export default function GraphProfile({slug,go}){
     <p className="ev-note gp-foot">Automated graph profile built from published abstracts. It describes what studies report and is not a clinical decision or individual risk tool.</p>
   </div>;
 }
+
+// Graph biomarkers from /api/library that the bundled catalog does not profile, as browsable cards.
+export function GraphBiomarkerList({go,query=''}){
+  const [rows,setRows]=useState(null);const [failed,setFailed]=useState(false);
+  useEffect(()=>{let active=true;fetch(`${API_BASE}/api/library`).then(r=>{if(!r.ok)throw Error();return r.json();}).then(d=>{if(active)setRows((d.entries||[]).filter(e=>e.entity_type==='biomarker'&&String(e.id).startsWith('graph:')));}).catch(()=>{if(active)setFailed(true);});return()=>{active=false;};},[]);
+  const q=query.trim().toLowerCase();
+  const shown=(rows||[]).filter(e=>[e.name,...(e.aliases||[])].join(' ').toLowerCase().includes(q)).sort((a,b)=>(b.coverage.quantified_outcomes-a.coverage.quantified_outcomes)||a.name.localeCompare(b.name));
+  return <section className="ev-browser" aria-labelledby="gp-graph-list">
+    <div className="ev-library-title"><h2 id="gp-graph-list">From the evidence graph{rows?` (${rows.length})`:''}</h2><span role="status">{failed?'The evidence graph list could not be loaded.':rows?`${shown.length} shown`:'Loading…'}</span></div>
+    <p className="ev-note">Automated graph profiles: aliases, five evidence layers and typed findings with source passages. GAP means no typed finding is indexed yet, not that none exist.</p>
+    {rows&&<div className="ev-grid">{shown.map(e=>{const n=e.coverage.quantified_outcomes;return <a key={e.id} className="ev-entity-card" href={e.path} onClick={ev=>{if(!ev.metaKey&&!ev.ctrlKey&&!ev.shiftKey&&!ev.altKey&&ev.button===0){ev.preventDefault();go(e.path);}}}>
+      <div className="ev-entity-card-top"><span>Biomarker · evidence graph</span></div>
+      <h3>{e.name}</h3>
+      <p>{(e.aliases||[]).filter(a=>a!==e.name).slice(0,3).join(' · ')||'No other names indexed'}</p>
+      <div className="ev-entity-card-bottom"><span>{n>0?`${n} typed ${n===1?'finding':'findings'}`:'GAP · no typed findings yet'}</span><span>{e.coverage.linked_studies} publications</span></div>
+    </a>;})}</div>}
+  </section>;
+}
