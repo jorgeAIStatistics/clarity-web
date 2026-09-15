@@ -1,0 +1,3 @@
+outcome,exposure,comparator,measure,estimate,ci_lower,ci_upper,n,population,follow_up,source
+Cardiovascular events,ApoB per 1 SD adjusted for LDL-C,Adjusted Cox model,HR,1.09,1.02,1.17,5120,Adults 40-75 without ASCVD,Median 8.4 years,Illustrative demo values - not a real study
+Incremental CVD discrimination,ApoB added to a model with LDL-C and risk factors,Same model without ApoB,C-index change,0.002,-0.001,0.005,5120,Adults 40-75 without ASCVD,10-year risk,Illustrative demo values - not a real study

@@ -4,7 +4,7 @@ import Library from "./platform/Library.jsx";
 import {API_BASE} from "./platform/api.js";
 import PlatformMethodology from "./platform/PlatformMethodology.jsx";
 import PlatformHome from "./platform/PlatformHome.jsx";
-import VisualProfile from "./profile/VisualProfile.jsx";
+import MeaningProfile from "./profile/MeaningProfile.jsx";
 import {compoundBrief} from "./platform/profileModel.js";
 import {withTransition, transitionView, animateDisclosure} from "./motion/navigation.js";
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -2358,7 +2358,7 @@ function MethodologyPage({ onBack }) {
 
 function ProfileView({view,onLearn}) {
  if(!view)return null;
- return <div className="profile-workspace" style={{paddingBottom:70}}><VisualProfile key={view.name} model={compoundBrief(view)} chemistry={view.chemistry}/></div>;
+ return <div className="profile-workspace" style={{paddingBottom:70}}><MeaningProfile key={view.name} kind="compound" view={view} model={compoundBrief(view)} chemistry={view.chemistry}/></div>;
 }
 
 // Expandable study card
