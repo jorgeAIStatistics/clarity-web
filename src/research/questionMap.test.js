@@ -32,7 +32,10 @@ test('the demo table is read without edits and keeps question types apart', () =
 
 test('the demo question asks association, utility and guidance but not mechanism', () => {
   const intents = Object.fromEntries(detectIntents(DEMO.question).map(i => [i.key, i.asked]));
-  assert.deepEqual(intents, { association: true, utility: true, mechanism: false, guideline: true });
+  assert.deepEqual(intents, { association: false, prediction: true, utility: true, mechanism: false, guideline: true, enrichment: false });
+  const il18 = Object.fromEntries(detectIntents('Interleukin-18 as a Potential Biomarker for Radiotherapy-Related Pain in Breast Cancer: Implications for Personalized Pain Management').map(i => [i.key, i.asked]));
+  assert.deepEqual(il18, { association: true, prediction: false, utility: true, mechanism: false, guideline: false, enrichment: false });
+  assert.ok(detectIntents('plasma NfL / ALS progression / trial enrichment').filter(i => i.asked).map(i => i.key).join() === 'prediction,enrichment');
   assert.deepEqual(detectIntents(DEMO.question, [], ['mechanism']).filter(i => i.asked).map(i => i.key), ['mechanism']);
 });
 
@@ -105,4 +108,12 @@ test('messy tables: combined cells, header measures, refusals and precise proble
   assert.deepEqual(bad.rows.map(r => r.issues[0]), ['Interval does not contain the estimate', 'Effect measure “Widgets” not recognized']);
   assert.match(readResultTable('Marker,Value\nApoB,1.2\n').needs.join(' '), /outcome/);
   assert.match(readResultTable(`Outcome,HR\n${'Stroke,1.1\n'.repeat(201)}`).error, /row-level data/);
+});
+
+test('retrieved papers with no resolved entity become one temporary row, not an empty map', () => {
+  const m = coverageMatrix({ entities: [], studies: [{ id: 'pmid:1', layer: 'observational', title: 'IL-18 and pain', findings: [] }, { id: 'pmid:2', layer: 'interventional', title: 'Trial', findings: [] }] });
+  assert.equal(m.rows.length, 1);
+  assert.ok(m.rows[0].temporary);
+  assert.deepEqual(m.rows[0].cells.map(c => c.count), [0, 0, 1, 1, 0]);
+  assert.equal(coverageMatrix({ entities: [], studies: [] }).rows.length, 0);
 });

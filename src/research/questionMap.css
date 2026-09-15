@@ -167,3 +167,6 @@
 @media(max-width:1100px){.qm-main-grid,.qm-side-grid{grid-template-columns:1fr}.qm-preview{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.qm-input,.qm-panel{padding:16px}.qm-preview,.qm-intent-editor{grid-template-columns:1fr}.qm-question-bar,.qm-drop{flex-direction:column;align-items:stretch}.qm-file{margin-left:0}.qm-skeleton div{grid-template-columns:1fr}.qm-restatement{font-size:16px}}
 @media(prefers-reduced-motion:reduce){.qm *{transition:none!important;animation:none!important}}
+
+.qm-limits{font-size:12.5px;color:#f0cf7a;margin:8px 0 0;max-width:95ch}
+.qm-interpret{font-size:13px;line-height:1.55;color:var(--qm-soft);margin:6px 0 0;max-width:95ch}

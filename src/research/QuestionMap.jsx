@@ -3,16 +3,18 @@ import { ArrowUpRight, Upload, Pencil, X } from 'lucide-react';
 import { API_BASE } from '../platform/api.js';
 import { researchInputError } from '../platform/tabular.js';
 import { safeSource } from '../platform/profileModel.js';
+import EffectDistribution from './EffectDistribution.jsx';
+import { forestCaption, forestInterpretation } from './figureModel.js';
 import CopilotResults from '../platform/CopilotResults.jsx';
 import { loadVisualSnapshot } from '../profile/useVisualReport.js';
 import { axisFor } from '../profile/visualModel.js';
 import { LAYERS, BANDS, list } from '../profile/meaningModel.js';
 import { describeEffect, measureFamily, num } from '../evidence/measures.js';
-import { DEMO, MAP_VERSION, lowerFirst, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount } from './questionMap.js';
+import { DEMO, MAP_VERSION, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount } from './questionMap.js';
 import { readResultTable, RESULT_ROLES } from './resultTable.js';
 import './questionMap.css';
 
-const TYPE = { biomarker: 'Biomarker', intervention: 'Compound', diagnostic: 'Test', screening: 'Screening', precision_oncology: 'Precision medicine' };
+const TYPE = { biomarker: 'Biomarker', intervention: 'Compound', compound: 'Compound', test: 'Test', diagnostic: 'Test', screening: 'Screening', precision_oncology: 'Precision medicine', condition: 'Condition', precision_context: 'Setting', retrieved: 'From retrieved papers' };
 const DIRECTION = { below: ['↓', 'Intervals below no difference'], above: ['↑', 'Intervals above no difference'], includes: ['◇', 'Intervals include no difference'], mixed: ['±', 'Mixed interval positions'], conflicting: ['⇅', 'Intervals on both sides of no difference'] };
 const REVIEW = { automated: ['auto', 'Automated extraction'], partial: ['part', 'Partially reviewed'], reviewed: ['rev', 'Reviewed'] };
 const LAYER_COLOR = { mechanism: '#8a70dc', preclinical: '#c7813a', observational: '#3f8ddb', interventional: '#1fa383', guidelines: '#b08418' };
@@ -46,8 +48,9 @@ function Heatmap({ matrix, intents, highlight, onOpen }) {
       <caption className="qm-sr">Records per profile and evidence layer. Select a cell to see its studies.</caption>
       <thead><tr><th scope="col">Profile</th>{LAYERS.map(l => <th scope="col" key={l.key} data-asked={askedLayers.has(l.key)}>{l.short}{askedLayers.has(l.key) && <small>asked</small>}</th>)}</tr></thead>
       <tbody>{matrix.rows.map(row => <tr key={row.id}>
-        <th scope="row"><a href={row.path}>{row.name}</a><small>{TYPE[row.type] || row.type}{row.primary ? ' · named' : ' · related'}{row.syntheses ? ` · +${row.syntheses} syntheses` : ''}</small></th>
+        <th scope="row">{row.path ? <a href={row.path}>{row.name}</a> : <span>{row.name}</span>}<small>{TYPE[row.type] || row.type}{row.temporary ? ' · temporary' : row.primary ? ' · named' : ' · related'}{row.syntheses ? ` · +${row.syntheses} syntheses` : ''}</small></th>
         {row.cells.map(c => <td key={c.layer}><button type="button" className="qm-cell" data-band={c.band} data-highlight={sameCell(c, highlight)} onClick={() => onOpen(c)}
+          title={`${c.count} records · ${c.review || 'GAP'}${c.examples[0]?.retrieved?.passage?.text ? ' · '+c.examples[0].retrieved.passage.text : ''}`}
           aria-label={`${row.name}, ${c.label}: ${c.count} ${c.count === 1 ? 'record' : 'records'}${c.direction ? `, ${DIRECTION[c.direction][1].toLowerCase()}` : ''}${c.review ? `, ${REVIEW[c.review][1].toLowerCase()}` : ''}. Open.`}>
           <span className="qm-count">{c.count || 'Gap'}</span>
           <span className="qm-cell-meta">{c.direction && <span title={DIRECTION[c.direction][1]}>{DIRECTION[c.direction][0]}</span>}{c.review && <span title={REVIEW[c.review][1]}>{REVIEW[c.review][0]}</span>}</span>
@@ -93,7 +96,7 @@ function Forest({ panel }) {
   const rowH = 30, top = 30, height = top + rows.length * rowH + 34;
   const label = r => (r.kind === 'user' ? `Your study${r.arm ? ` · ${r.arm}` : ''}` : `${r.cohort ? r.cohort.replaceAll('-', ' ') : `PMID ${r.pmid}`}${r.year ? ` · ${r.year}` : ''}`);
   return <figure className="qm-forest">
-    <figcaption><strong>{panel.fam.label}</strong> · {panel.mode}<span>{panel.fam.scale === 'log' ? 'Log' : 'Linear'} axis · reported intervals · nothing pooled</span></figcaption>
+    <figcaption><strong>{forestCaption(panel)}</strong><span>{panel.fam.label} · {panel.mode} · {panel.fam.scale === 'log' ? 'log' : 'linear'} axis · reported intervals · nothing pooled</span></figcaption>
     <div className="qm-svg-scroll"><svg viewBox={`0 0 ${W} ${height}`} role="group" aria-label={`${panel.fam.label} estimates for ${panel.mode.toLowerCase()}: ${published.length} published${panel.user.length ? `, ${panel.user.length} from your table` : ''}`}>
       {ticks.values.map((t, i) => <g key={i}><line x1={x(t)} x2={x(t)} y1={top - 6} y2={height - 28} className="qm-grid" /><text x={x(t)} y={height - 10} textAnchor="middle" className="qm-tick">{labels[i]}</text></g>)}
       {panel.fam.nullValue != null && <g><line x1={x(panel.fam.nullValue)} x2={x(panel.fam.nullValue)} y1={top - 12} y2={height - 28} className="qm-null" /><text x={x(panel.fam.nullValue)} y={top - 16} textAnchor="middle" className="qm-null-label">no difference</text></g>}
@@ -110,12 +113,14 @@ function Forest({ panel }) {
       })}
     </svg></div>
     {published.length > shown.length && <p className="qm-note">{published.length - shown.length} more published estimates are in the records list below.</p>}
+    <p className="qm-limits">Limits: source-specific populations, exposures and follow-up; intervals are not pooled, weighted or converted between measures.</p>
+    <p className="qm-interpret">{forestInterpretation(panel)}</p>
     {panel.note && <p className="qm-note">{panel.note}</p>}
     {panel.comparison.map(c => <p key={c.id} className="qm-compare"><span className="qm-tag">Computed</span>{c.text}</p>)}
   </figure>;
 }
 
-function CellDrawer({ cell, onClose }) {
+function CellDrawer({ cell, onClose, estimates }) {
   const ref = useRef(null), titleId = useId();
   useEffect(() => {
     const dialog = ref.current, previous = document.activeElement;
@@ -129,20 +134,22 @@ function CellDrawer({ cell, onClose }) {
   return <dialog ref={ref} className="qm-drawer" aria-labelledby={titleId} onCancel={e => { e.preventDefault(); onClose(); }} onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
     <header><span className="qm-eyebrow">{cell.entity} · {cell.label}</span><button type="button" onClick={onClose} aria-label="Close"><X size={18} /></button></header>
     <h2 id={titleId}>{cell.count ? `${cell.count} ${cell.count === 1 ? 'record' : 'records'} in this layer` : 'A gap in this layer'}</h2>
+    {cell && [...new Set(estimates.filter(e => e.layer === cell.layer && e.entityIds.includes(cell.entityId)).map(e => e.outcome))].map(outcome => landscapePanels(estimates.filter(e => e.layer === cell.layer && e.entityIds.includes(cell.entityId)), outcome).map(p => <Forest key={outcome+p.key} panel={p} />))}
     <p className="qm-asks">This layer answers: {layer.asks}</p>
     {cell.count ? <>
       <p>{cell.direction ? `${DIRECTION[cell.direction][1]}: ${cell.directions.below} below, ${cell.directions.above} above, ${cell.directions.includes} including no difference.` : 'No reported intervals in these records.'} {REVIEW[cell.review]?.[1]}.</p>
       <ul className="qm-drawer-list">{cell.examples.map(x => <li key={x.id}>
         {safeSource(x.url) ? <a href={safeSource(x.url)} target="_blank" rel="noreferrer">{x.title || x.id} <ArrowUpRight size={13} aria-hidden="true" /></a> : <strong>{x.title || x.id}</strong>}
         <small>{[x.design, x.year, x.quantified ? 'has a quote-backed estimate' : null].filter(Boolean).join(' · ')}</small>
-        {x.retrieved?.findings?.slice(0, 2).map((f, i) => <p key={i}>{f.outcome}: {describeEffect({ fam: measureFamily(f.effect?.measure), point: f.effect?.estimate, lower: f.effect?.lower, upper: f.effect?.upper, level: f.effect?.confidence_level }).number || 'no usable estimate'}</p>)}
+        {x.retrieved?.passage?.text && <blockquote>{x.retrieved.passage.text}</blockquote>}
+        {x.retrieved?.findings?.filter(f => f.plot_eligible !== false).slice(0, 2).map((f, i) => <p key={i}>{f.outcome}: {describeEffect({ fam: measureFamily(f.effect?.measure), point: f.effect?.estimate, lower: f.effect?.lower, upper: f.effect?.upper, level: f.effect?.confidence_level }).number || 'no usable estimate'}</p>)}
       </li>)}</ul>
       {cell.count > cell.examples.length && <p className="qm-note">Showing {cell.examples.length} of {cell.count}. The profile lists every record.</p>}
     </> : <>
       <p>No {cell.label.toLowerCase()} records are linked to {cell.entity} in the Clarity library. This is a gap in the library, not proof that no such research exists.</p>
       <p><a href={pubmedSearch(cell.entity, cell.layer)} target="_blank" rel="noreferrer">Search PubMed for this layer <ArrowUpRight size={13} aria-hidden="true" /></a></p>
     </>}
-    <a className="qm-button qm-primary" href={cell.path}>Open the {cell.entity} profile <ArrowUpRight size={15} aria-hidden="true" /></a>
+    {cell.path && <a className="qm-button qm-primary" href={cell.path}>Open the {cell.entity} profile <ArrowUpRight size={15} aria-hidden="true" /></a>}
   </dialog>;
 }
 
@@ -170,7 +177,7 @@ export default function QuestionMap() {
   const busy = ['resolving', 'mapping'].includes(status.phase);
   const matrix = useMemo(() => (result ? coverageMatrix(result, submitted) : null), [result, submitted]);
   const estimates = useMemo(() => (result ? publishedEstimates(result, snapshot) : []), [result, snapshot]);
-  const intents = useMemo(() => detectIntents(submitted, result?.copilot?.question?.focus, edits?.intents || null), [submitted, result, edits]);
+  const intents = useMemo(() => detectIntents(submitted, result?.copilot?.question?.focus, edits?.intents || (result?.intent ? result.intent.intents.map(x => ({ clinical_utility: 'utility' }[x] || x)) : null)), [submitted, result, edits]);
   const questionFields = useMemo(() => ({ population: edits?.population ? [edits.population] : result?.copilot?.question?.population || [], outcomes: edits?.outcome ? [edits.outcome] : result?.copilot?.question?.outcomes || [] }), [edits, result]);
   const options = useMemo(() => outcomeOptions(estimates, userRows, questionFields.outcomes), [estimates, userRows, questionFields]);
   const current = options.some(o => o.name === outcome) ? outcome : options[0]?.name || '';
@@ -206,7 +213,7 @@ export default function QuestionMap() {
     const problem = researchInputError(text);
     if (problem) { setStatus({ phase: 'error', message: problem }); return; }
     controller.current?.abort();
-    const c = new AbortController(), timer = setTimeout(() => c.abort(), 45000);
+    const c = new AbortController(), timer = setTimeout(() => c.abort(), 75000);
     controller.current = c;
     try {
       let body = text.trim(), reference = null;
@@ -255,7 +262,7 @@ export default function QuestionMap() {
     onDrop: e => { e.preventDefault(); setDragging(false); readFile(e.dataTransfer.files?.[0]); },
   };
   const fileInput = <label className="qm-button qm-file">Choose a table<input type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" onChange={e => { readFile(e.target.files?.[0]); e.target.value = ''; }} /></label>;
-  const restatement = result ? `Examine ${list(result.copilot.question.primary_concepts.map(c => c.name)) || list(result.entities.slice(0, 3).map(e => e.name)) || 'the concepts you named'} in ${list(questionFields.population) || 'a population to specify'} for ${list(questionFields.outcomes.map(lowerFirst)) || 'an outcome to specify'}.` : '';
+  const restatement = result?.copilot?.question?.restatement || '';
   const byType = result ? Object.entries(result.entities.reduce((m, e) => ({ ...m, [e.entity_type]: [...(m[e.entity_type] || []), e] }), {})) : [];
 
   return <div className="qm">
@@ -276,7 +283,7 @@ export default function QuestionMap() {
           <button type="button" className="qm-button" onClick={loadDemo} disabled={busy}>Load the ApoB vs LDL-C demo</button>
           {ready && <button type="button" className="qm-button" onClick={() => setEditingQuestion(false)}>Keep the current map</button>}
         </div>
-        <p className="qm-note">Your question goes to Clarity’s retrieval service and is not stored. Tables are read in this browser; only their outcome names join the search. Aggregate research data only, never patient-level records. Not for personal health decisions.</p>
+        <p className="qm-note">Claude parses your question; Clarity retrieves from Neo4j. The full question is not stored. Unrecognized entity names may be retained temporarily for seven days. Tables are read in this browser; only their outcome names join the search. Aggregate research data only, never patient-level records. Not for personal health decisions.</p>
       </form>}
     </section>
 
@@ -290,11 +297,12 @@ export default function QuestionMap() {
       <section className="qm-panel qm-intent" aria-labelledby="qm-a">
         <Head id="qm-a" letter="A" title="What your question asks" headingRef={mapHeading}><button type="button" className="qm-button qm-ghost" onClick={() => setEditingIntent(v => !v)}><Pencil size={14} aria-hidden="true" /> Edit</button></Head>
         <p className="qm-restatement">{restatement}{edits && <span className="qm-tag">Edited</span>}</p>
+        {result.parse?.mode === 'rules' && <p className="qm-need">{result.copilot.question.note}</p>}
         <div className="qm-intent-row">
           <ul className="qm-intents" aria-label="Evidence questions in your question">{intents.map(i => <li key={i.key} data-asked={i.asked} title={`${i.question} Answered by ${i.answeredBy}.`}>
             <span className="qm-intent-mark" aria-hidden="true">{i.asked ? '●' : '○'}</span><strong>{i.label}</strong><span className="qm-intent-col">{i.asked ? 'asked' : 'not asked'} · {LAYERS.find(l => l.key === i.layer).short} column</span>
           </li>)}</ul>
-          <p className="qm-detected">{byType.map(([type, items]) => <span key={type}><strong>{TYPE[type] || type}</strong>{items.map((e, i) => <React.Fragment key={e.id}>{i ? ', ' : ''}<a href={e.path}>{e.name}</a></React.Fragment>)}</span>)}</p>
+          <p className="qm-detected">{byType.map(([type, items]) => <span key={type}><strong>{TYPE[type] || type}</strong>{items.map((e, i) => <React.Fragment key={e.id}>{i ? ', ' : ''}{e.path ? <a href={e.path}>{e.name}</a> : <span>{e.name}</span>}</React.Fragment>)}</span>)}</p>
         </div>
         <details className="qm-intent-help"><summary>Why these questions are kept apart</summary><ul>{intents.map(i => <li key={i.key}><strong>{i.label}.</strong> {i.question} Answered by {i.answeredBy}, shown in the {LAYERS.find(l => l.key === i.layer).short} column.</li>)}</ul><p>{result.copilot.question.note}</p></details>
         {editingIntent && <IntentEditor initial={{ population: questionFields.population[0] || '', outcome: questionFields.outcomes[0] || '', intents: intents.filter(i => i.asked).map(i => i.key) }} onCancel={() => setEditingIntent(false)} onSubmit={value => { setEdits(value); setEditingIntent(false); run({ text: submitted, nextEdits: value }); }} />}
@@ -304,7 +312,7 @@ export default function QuestionMap() {
         <section className="qm-panel" aria-labelledby="qm-b">
           <Head id="qm-b" letter="B" title="Evidence coverage by layer" />
           <p className="qm-sub">Shade shows how many records the library holds, not how strong they are. Gaps are cells too. Select any cell to see its studies.</p>
-          {matrix.rows.length ? <Heatmap matrix={matrix} intents={intents} highlight={highlight} onOpen={setDrill} /> : <p>No catalog profile matched this question. Name a compound, biomarker, test or treatment and map it again.</p>}
+          {matrix.rows.length ? <Heatmap matrix={matrix} intents={intents} highlight={highlight} onOpen={setDrill} /> : <p>No entity could be resolved. Edit the named biomarker, intervention or condition and try again.</p>}
           <p className="qm-note">{matrix.note}</p>
         </section>
 
@@ -312,7 +320,7 @@ export default function QuestionMap() {
           <Head id="qm-c" letter="C" title="Outcome landscape" />
           {options.length > 0 ? <label className="qm-select">Outcome<select value={current} onChange={e => setOutcome(e.target.value)}>{options.map(o => <option key={o.name} value={o.name}>{o.name} · {o.count} published{o.user ? ` · ${o.user} yours` : ''}</option>)}</select></label>
             : <p>No quote-backed estimates were retrieved for these profiles. Open a heatmap cell to read the records.</p>}
-          {panels.map(p => <Forest key={p.key} panel={p} />)}
+          {panels.map(p => <React.Fragment key={p.key}><Forest panel={p} /><EffectDistribution panel={p} /></React.Fragment>)}
           {panels.length > 0 && <div className="qm-legend"><span><i className="qm-dot" style={{ background: LAYER_COLOR.interventional }} />Human trial</span><span><i className="qm-dot" style={{ background: LAYER_COLOR.observational }} />Observational</span><span><i className="qm-dot" style={{ background: '#9fb3c4' }} />Synthesis or other</span><span><i className="qm-diamond" />Your study</span></div>}
           {!upload?.placeable?.length && <div className="qm-drop compact" data-active={dragging} {...dropProps}><div><strong>Place your own study on this landscape</strong><span>Drop an aggregate results table here, or choose one.</span></div>{fileInput}</div>}
           {upload && !upload.error && upload.placeable.length > 0 && !panels.some(p => p.user.length) && <p className="qm-note">Your table’s outcomes ({list([...new Set(upload.placeable.map(r => r.outcome))])}) do not match this outcome. Choose one of your outcomes above.</p>}
@@ -342,8 +350,8 @@ export default function QuestionMap() {
 
       <details className="qm-panel qm-records"><summary>Records, passages and reading path · {result.studies.length} retrieved of {result.coverage.studies.toLocaleString('en-US')} indexed</summary><CopilotResults result={result} /></details>
       <p className="qm-workspace">Need row-level inclusion decisions, dimension-by-dimension comparison and an audit trail? <a href="/explore/matcher?mode=workspace">Open the study workspace</a></p>
-      <details className="qm-method"><summary>Method and limits</summary><p>{MAP_VERSION} on {result.version}. Coverage counts every record linked to each profile in Clarity’s retained index; directions place reported intervals against each measure’s no-difference value and are not benefit or harm judgments. Published estimates are quote-backed extractions shown on their own measure’s axis; nothing is pooled or converted. Tensions and the next step come from fixed rules over these cells, and support or contradiction is never judged automatically. The library is selected, not an exhaustive search.</p></details>
+      <details className="qm-method"><summary>Method and limits</summary><p>{MAP_VERSION} on {result.version}. Coverage counts graph records constrained to the current question; directions place reported intervals against each measure’s no-difference value and are not benefit or harm judgments. Published estimates are quote-backed extractions shown on their own measure’s axis; nothing is pooled or converted. Tensions and the next step come from fixed rules over these cells, and support or contradiction is never judged automatically. The library is selected, not an exhaustive search.</p></details>
     </div>}
-    <CellDrawer cell={drill} onClose={() => setDrill(null)} />
+    <CellDrawer estimates={estimates} cell={drill} onClose={() => setDrill(null)} />
   </div>;
 }

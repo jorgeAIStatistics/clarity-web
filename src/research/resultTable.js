@@ -10,6 +10,7 @@ export const RESULT_ROLES = [
   ['ci', 'Confidence interval (one cell)', /^(?:95\s*%?\s*)?(?:ci|confidence interval)$|^confidence interval/i],
   ['level', 'Confidence level (%)', /(?:ci|confidence)[ _.-]?level|^level$/i],
   ['n', 'Sample size (n)', /^n$|^n[ _.(]|sample[ _.-]?size|^participants$|^subjects$|^number of participants|^total[ _]n$/i],
+  ['unit', 'Effect unit / scale increment', /^units?$|scale[ _-]?increment/i],
   ['metric', 'Effect measure', /metric|measure|effect[ _.-]?type|statistic|estimate[ _.-]?type/i],
   ['outcome', 'Outcome / endpoint', /outcome|endpoint|end[ _.-]point/i],
   ['comparator', 'Comparator / reference', /comparator|control|reference|versus|\bvs\b/i],
@@ -81,7 +82,7 @@ export function readResults(table, mapping) {
     if (fam && point != null && !validInterval(fam, point, lower, upper)) issues.push(fam.scale === 'log' && (point <= 0 || lower <= 0) ? 'Ratio values must be above 0' : 'Interval does not contain the estimate');
     const placeable = Boolean(outcome && fam && point != null && validInterval(fam, point, lower, upper));
     if (placeable && lower == null) issues.push('No interval: shown as a point only');
-    return { id: `user-${i + 1}`, row: i + 1, outcome, arm: get(row, 'arm'), n: parseNumber(get(row, 'n')), metric: metricText || fam?.label || '', fam, point, lower, upper, level, population: get(row, 'population'), exposure: get(row, 'exposure'), comparator: get(row, 'comparator'), timepoint: get(row, 'timepoint'), mode, modeInferred: !modeText, placeable, issues };
+    return { id: `user-${i + 1}`, row: i + 1, outcome, arm: get(row, 'arm'), n: parseNumber(get(row, 'n')), metric: metricText || fam?.label || '', fam, point, lower, upper, level, population: get(row, 'population'), exposure: get(row, 'exposure'), comparator: get(row, 'comparator'), timepoint: get(row, 'timepoint'), unit: get(row, 'unit'), mode, modeInferred: !modeText, placeable, issues };
   });
 }
 

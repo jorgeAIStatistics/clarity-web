@@ -13,12 +13,14 @@ export const DEMO = {
 };
 
 export const INTENTS = [
-  { key: 'association', label: 'Association', layer: 'observational', question: 'Is it linked with the outcome?', answeredBy: 'human observational studies', pattern: /associat|correlat|\brisk\b|predict|prognos|linked? (?:to|with)|beyond|incremental|discrimin/i },
-  { key: 'utility', label: 'Clinical utility', layer: 'interventional', question: 'Does acting on it improve outcomes?', answeredBy: 'trials that compare strategies or treatments', pattern: /clinical utility|improv\w* (?:patient )?outcomes|change\w* (?:outcomes|management|care|decisions)|[- ]guided|acting on|efficacy|\bbenefit|randomi[sz]ed/i },
+  { key: 'association', label: 'Association', layer: 'observational', question: 'Is it linked with the outcome?', answeredBy: 'human observational studies', pattern: /associat|correlat|\brisk\b|linked? (?:to|with)|biomarker/i },
+  { key: 'prediction', label: 'Prediction', layer: 'observational', question: 'Does it forecast progression or add to existing risk models?', answeredBy: 'prognostic cohorts and model-comparison studies', pattern: /predict|progression|prognos|discrimin|incremental|c-?index|reclassif|beyond/i },
+  { key: 'utility', label: 'Clinical utility', layer: 'interventional', question: 'Does acting on it improve outcomes?', answeredBy: 'trials that compare strategies or treatments', pattern: /clinical utility|improv\w* (?:patient )?outcomes|change\w* (?:outcomes|management|care|decisions)|[- ]guided|acting on|personali[sz]ed|management|efficacy|\bbenefit|randomi[sz]ed/i },
   { key: 'mechanism', label: 'Mechanism', layer: 'mechanism', question: 'Is there a biological explanation?', answeredBy: 'mechanism and animal studies', pattern: /mechanis|pathway|biolog|in vitro|\bcells?\b|animal|mouse|mice|\brats?\b|preclinical/i },
   { key: 'guideline', label: 'Guideline', layer: 'guidelines', question: 'What does guidance say?', answeredBy: 'guideline and regulatory records', pattern: /guideline|recommendation|consensus|regulat|guidance|\bfda\b|\bema\b|uspstf/i },
+  { key: 'enrichment', label: 'Trial enrichment', layer: 'interventional', question: 'Can it select who enters a trial?', answeredBy: 'trials or trial analyses that select or stratify by the marker', pattern: /enrich|stratif\w* (?:trial|enrol)|trial selection/i },
 ];
-const FOCUS = { association: ['association', 'incremental'], utility: ['utility', 'treatment'], guideline: ['guidelines'], mechanism: [] };
+const FOCUS = { association: ['association'], prediction: ['incremental'], utility: ['utility', 'treatment'], guideline: ['guidelines'], mechanism: [], enrichment: [] };
 export function detectIntents(text, focus = [], chosen = null) {
   const ids = new Set(focus.map(f => f.id));
   return INTENTS.map(i => ({ ...i, asked: chosen ? chosen.includes(i.key) : i.pattern.test(text || '') || FOCUS[i.key].some(id => ids.has(id)) }));
@@ -70,8 +72,19 @@ export function coverageMatrix(result, text = '') {
       }
       return makeCell(e, l, linked.length, directions, linked.filter(s => s.review_status === 'reviewed').length, linked.map(s => ({ id: s.id, title: s.title, year: s.year, design: s.design, url: s.url, quantified: Boolean(s.findings?.length) })), studies);
     });
-    return { id: e.id, name: e.name, type: e.entity_type, path: e.path, primary: Boolean(e.matched_aliases?.length), mention: mention(e, text), cells, syntheses: own ? own.syntheses || 0 : studies.filter(s => s.entity_ids?.includes(e.id) && s.layer === 'synthesis').length };
+    return { id: e.id, name: e.name, type: e.entity_type, path: e.path, primary: Boolean(e.matched_aliases?.length), temporary: Boolean(e.ephemeral || String(e.id).startsWith('temporary:')), mention: mention(e, text), cells, syntheses: own ? own.syntheses || 0 : studies.filter(s => s.entity_ids?.includes(e.id) && s.layer === 'synthesis').length };
   }).sort((a, b) => b.primary - a.primary || a.mention - b.mention);
+  // Papers were retrieved but no entity resolved: count those papers in one temporary row rather than showing an empty map.
+  if (!rows.length && studies.length) {
+    const paper = { id: 'temporary:retrieved-papers', name: 'Papers retrieved for this question', entity_type: 'retrieved', path: null };
+    const cells = LAYERS.map(l => {
+      const linked = studies.filter(s => s.layer === l.key), directions = { below: 0, above: 0, includes: 0 };
+      for (const s of linked) for (const f of s.findings || []) { const side = intervalSide(measureFamily(f.effect?.measure), f.effect?.lower, f.effect?.upper); if (side) directions[side]++; }
+      return makeCell(paper, l, linked.length, directions, linked.filter(s => s.review_status === 'reviewed').length, linked.map(s => ({ id: s.id, title: s.title, year: s.year, design: s.design, url: s.url, quantified: Boolean(s.findings?.length) })), studies);
+    });
+    rows.push({ id: paper.id, name: paper.name, type: 'retrieved', path: null, primary: true, temporary: true, mention: 0, cells, syntheses: studies.filter(s => s.layer === 'synthesis').length });
+    return { rows, basis: 'retrieved', note: 'No named entity was resolved, so this temporary row counts the retrieved papers by layer. Name the biomarker, compound or test to map it directly.' };
+  }
   return { rows, basis: library ? 'library' : 'retrieved', note: library ? result.layer_coverage.basis : 'Counts cover only the records retrieved for this question; the full library may hold more.' };
 }
 
@@ -94,13 +107,14 @@ export function publishedEstimates(result, snapshotProfiles = {}) {
     else out.set(key, e);
   };
   for (const [pid, profile] of Object.entries(snapshotProfiles || {})) {
-    if (!ids.has(pid)) continue;
+    if (result?.intent || !ids.has(pid)) continue;
     for (const r of profile.records || []) if (validRecord(r)) put({ id: r.id, pmid: String(r.pmid), url: r.url, title: r.title, year: r.year, outcome: r.outcome, mode: r.mode, fam: measureFamily(r.metric), point: r.point, lower: r.lower, upper: r.upper, level: r.intervalLevel, unit: r.unit, n: r.n, population: plainPopulation(r.context?.population), exposure: r.context?.exposure, comparator: r.context?.comparator, layer: r.layer, design: r.design, quote: r.quote, cohort: r.cohort, entityIds: [pid] });
   }
   for (const s of result?.studies || []) for (const f of s.findings || []) {
+    if (result?.intent && !f.plot_eligible) continue;
     if (f.effect?.origin && f.effect.origin !== 'reported') continue;
     const fam = measureFamily(f.effect?.measure);
-    put({ id: `${s.id}:${f.outcome}:${f.effect?.estimate}`, pmid: String(s.pmid || s.id).replace('pmid:', ''), url: s.url, title: s.title, year: s.year, outcome: f.outcome, mode: inferMode(fam, s.layer, `${s.design || ''} ${s.title || ''}`), fam, point: f.effect?.estimate, lower: f.effect?.lower, upper: f.effect?.upper, level: f.effect?.confidence_level, unit: f.effect?.units, n: s.n, population: plainPopulation(f.population || s.population), exposure: f.exposure || s.exposure, comparator: f.comparator || s.comparator, layer: s.layer, design: s.design, quote: f.quote, cohort: s.cohort_id, entityIds: f.entity_ids || s.entity_ids || [] });
+    put({ id: `${s.id}:${f.outcome}:${f.effect?.estimate}`, pmid: String(s.pmid || s.id).replace('pmid:', ''), url: s.url, title: s.title, year: s.year, outcome: f.outcome, mode: inferMode(fam, s.layer, `${s.design || ''} ${s.title || ''}`), fam, point: f.effect?.estimate, lower: f.effect?.lower, upper: f.effect?.upper, level: f.effect?.confidence_level, unit: f.effect?.units, n: s.n, population: plainPopulation(f.population || s.population), exposure: f.exposure || s.exposure, comparator: f.comparator || s.comparator, layer: s.layer, design: s.design, quote: f.quote, cohort: s.cohort_id, timepoint: f.timepoint || s.timepoint, entityIds: f.entity_ids || s.entity_ids || [] });
   }
   return [...out.values()];
 }
@@ -167,8 +181,9 @@ export function mapTensions({ matrix, intents, estimates = [], result, compariso
   if (asked('guideline')) for (const row of rows) { const g = cell(row, 'guidelines'); if (!g.count) add('guideline_gap', `No guideline or regulatory records are linked to ${row.name}, so the guidance part of your question is unanswered here.`, g); }
   if (asked('mechanism')) for (const row of rows) { const m = cell(row, 'mechanism'); if (!m.count && !cell(row, 'preclinical').count) add('mechanism_gap', `No mechanism or animal records are linked to ${row.name}.`, m); }
   for (const row of rows.filter(r => r.type === 'intervention')) { const trial = cell(row, 'interventional'); if (!trial.count && cell(row, 'preclinical').count + cell(row, 'mechanism').count) add('untested', `${row.name}: animal or laboratory records exist, but no human trials are linked.`, trial); }
-  const shared = (result?.copilot?.tensions || []).find(t => t.status === 'record_metadata');
-  if (shared) add('shared_cohort', `${shared.study_ids.length} retrieved records name the same cohort or trial; they share participants and are not independent replications.`);
+  const sourceIds = new Set((result?.studies || []).map(s => s.id));
+  const shared = (result?.copilot?.tensions || []).find(t => t.status === 'record_metadata' && t.study_ids?.length > 1 && t.study_ids.every(id => sourceIds.has(id)));
+  if (shared) add('shared_cohort', `${shared.study_ids.length} retrieved records name the same cohort or trial; participant overlap is possible and must be checked before treating them as independent replications.`);
   return out;
 }
 
@@ -190,7 +205,7 @@ export function nextStep({ matrix, intents, estimates = [], question = {}, compa
   }
   const outside = comparisons.find(c => c.overlaps === 0);
   if (outside) return { title: 'Reconcile your estimate with the published range', design: 'Sensitivity analysis aligned to the published exposure contrast and adjustment set', population, outcome: endpoint, stratum: null, why: `Your interval overlaps none of the ${outside.of} published intervals on the same scale. Rule out differences in exposure scaling, adjustment and population before interpreting a real difference.`, cells: [], note };
-  if (prediction.length && asked('association')) return { title: `Test whether adding ${lead.name} improves risk classification`, design: 'External validation with calibration and reclassification, not discrimination alone', population, outcome: endpoint, stratum: null, why: `Published C-index gains are at most ${num(maxGain)} on a 0.5–1 scale. Whether ${lead.name} moves people across decision thresholds in ${population} is still open.`, cells: [cell(lead, 'observational')], note };
+  if (prediction.length && (asked('prediction') || asked('association'))) return { title: `Test whether adding ${lead.name} improves risk classification`, design: 'External validation with calibration and reclassification, not discrimination alone', population, outcome: endpoint, stratum: null, why: `Published C-index gains are at most ${num(maxGain)} on a 0.5–1 scale. Whether ${lead.name} moves people across decision thresholds in ${population} is still open.`, cells: [cell(lead, 'observational')], note };
   const untested = focus.find(r => r.type === 'intervention' && !cell(r, 'interventional').count && cell(r, 'preclinical').count + cell(r, 'mechanism').count);
   if (untested) return { title: `Run a first controlled human study of ${untested.name} for ${lowerFirst(endpoint)}`, design: 'Randomized, placebo-controlled pilot with a pre-registered primary outcome', population, outcome: endpoint, stratum: null, why: `${cell(untested, 'preclinical').count + cell(untested, 'mechanism').count} animal or laboratory records but no human trials are linked, so effects in people are untested.`, cells: [cell(untested, 'interventional')], note };
   if (asked('guideline') && focus.every(r => !cell(r, 'guidelines').count)) return { title: `Check guideline bodies directly for ${lead.name}`, design: 'Structured guidance review: scope, date and evidence basis', population, outcome: endpoint, stratum: null, why: 'No guideline or regulatory records are linked for the profiles in this question.', cells: [cell(lead, 'guidelines')], note };
@@ -207,7 +222,7 @@ export function composeQuery(question, { edits = null, rows = [] } = {}) {
   const lines = [String(question || '').trim()];
   if (edits?.population) lines.push(`context: ${edits.population}`);
   if (edits?.outcome) lines.push(`outcome: ${edits.outcome}`);
-  for (const key of edits?.intents || []) lines.push({ association: 'Focus: association and risk prediction.', utility: 'Focus: clinical utility.', mechanism: 'Focus: mechanism.', guideline: 'Focus: guidelines.' }[key]);
+  for (const key of edits?.intents || []) lines.push({ association: 'Focus: association.', prediction: 'Focus: prediction beyond existing models.', utility: 'Focus: clinical utility.', mechanism: 'Focus: mechanism.', guideline: 'Focus: guidelines.', enrichment: 'Focus: trial enrichment.' }[key]);
   if (!edits?.outcome) for (const outcome of [...new Set(rows.filter(r => r.outcome).map(r => r.outcome))].slice(0, 5)) lines.push(`outcome: ${outcome}`);
   return lines.filter(Boolean).join('\n').slice(0, 12000);
 }
