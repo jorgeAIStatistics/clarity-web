@@ -243,3 +243,15 @@ export function mapFailure({ status = 0, data = null, error = null } = {}) {
 export async function readJson(response) {
   try { return await response.json(); } catch { return null; }
 }
+
+const OBSERVATION_LABEL = { association: 'Association', discrimination: 'Discrimination', classification: 'Classification', prognosis: 'Prognosis', utility: 'Clinical utility', guideline: 'Guideline' };
+// One line per source-bound finding, including accuracy, cut-off and guideline findings that are never plotted.
+export function findingLine(f) {
+  const label = OBSERVATION_LABEL[f.observation_type] || 'Reported finding';
+  const e = f.effect || {}, fam = measureFamily(e.measure);
+  const number = fam && Number.isFinite(e.estimate)
+    ? describeEffect({ fam, point: e.estimate, lower: e.lower, upper: e.upper, level: e.confidence_level }).number
+    : [e.measure, Number.isFinite(e.estimate) ? num(e.estimate) : '', Number.isFinite(e.lower) && Number.isFinite(e.upper) ? `(${num(e.lower)} to ${num(e.upper)})` : ''].filter(Boolean).join(' ');
+  const threshold = Number.isFinite(f.threshold) ? ` at a cut-off of ${num(f.threshold)}${f.threshold_unit ? ` ${f.threshold_unit}` : ''}` : '';
+  return `${label} · ${f.outcome}: ${Number.isFinite(e.estimate) || e.measure === 'cut-off' ? number : f.statement || 'no number reported'}${threshold}`;
+}

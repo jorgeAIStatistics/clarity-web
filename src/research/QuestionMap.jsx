@@ -10,7 +10,7 @@ import { loadVisualSnapshot } from '../profile/useVisualReport.js';
 import { axisFor } from '../profile/visualModel.js';
 import { LAYERS, BANDS, list } from '../profile/meaningModel.js';
 import { describeEffect, measureFamily, num } from '../evidence/measures.js';
-import { DEMO, MAP_VERSION, mapFailure, readJson, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount } from './questionMap.js';
+import { DEMO, MAP_VERSION, mapFailure, readJson, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount } from './questionMap.js';
 import { readResultTable, RESULT_ROLES } from './resultTable.js';
 import './questionMap.css';
 
@@ -142,7 +142,7 @@ function CellDrawer({ cell, onClose, estimates }) {
         {safeSource(x.url) ? <a href={safeSource(x.url)} target="_blank" rel="noreferrer">{x.title || x.id} <ArrowUpRight size={13} aria-hidden="true" /></a> : <strong>{x.title || x.id}</strong>}
         <small>{[x.design, x.year, x.quantified ? 'has a quote-backed estimate' : null].filter(Boolean).join(' · ')}</small>
         {x.retrieved?.passage?.text && <blockquote>{x.retrieved.passage.text}</blockquote>}
-        {x.retrieved?.findings?.filter(f => f.plot_eligible !== false).slice(0, 2).map((f, i) => <p key={i}>{f.outcome}: {describeEffect({ fam: measureFamily(f.effect?.measure), point: f.effect?.estimate, lower: f.effect?.lower, upper: f.effect?.upper, level: f.effect?.confidence_level }).number || 'no usable estimate'}</p>)}
+        {(x.retrieved?.findings || []).slice(0, 4).map((f, i) => <p key={i}>{findingLine(f)}</p>)}
       </li>)}</ul>
       {cell.count > cell.examples.length && <p className="qm-note">Showing {cell.examples.length} of {cell.count}. The profile lists every record.</p>}
     </> : <>

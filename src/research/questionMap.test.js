@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { DEMO, BUSY_MESSAGE, mapFailure, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, sameOutcome } from './questionMap.js';
+import { DEMO, BUSY_MESSAGE, mapFailure, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, sameOutcome } from './questionMap.js';
 import { readResultTable, parseEstimateCell, parseInterval } from './resultTable.js';
 
 const snapshot = JSON.parse(fs.readFileSync(new URL('../../public/visual-evidence.json', import.meta.url))).profiles;
@@ -124,4 +124,10 @@ test('overload and network failures become a retryable busy message; request err
   assert.deepEqual(mapFailure({ error: new TypeError('Failed to fetch') }), { retry: true, message: BUSY_MESSAGE });
   assert.match(mapFailure({ error: Object.assign(new Error('x'), { name: 'AbortError' }) }).message, /too long/);
   assert.deepEqual(mapFailure({ status: 400, data: { error: 'Enter between 20 and 12,000 characters.' } }), { retry: false, message: 'Enter between 20 and 12,000 characters.' });
+});
+
+test('drill-down lines name the observation type and keep accuracy and cut-off findings', () => {
+  assert.equal(findingLine({ observation_type: 'classification', outcome: 'neuroendocrine neoplasms', effect: { measure: 'sensitivity', estimate: 71 }, threshold: 100, threshold_unit: 'ng/mL' }), 'Classification · neuroendocrine neoplasms: Sensitivity 71 at a cut-off of 100 ng/mL');
+  assert.equal(findingLine({ observation_type: 'prognosis', outcome: 'overall survival', effect: { measure: 'hazard ratio', estimate: 2.1, lower: 1.3, upper: 3.4, confidence_level: 95 } }), 'Prognosis · overall survival: HR 2.1 (95% CI 1.3 to 3.4)');
+  assert.equal(findingLine({ observation_type: 'guideline', outcome: 'Guidelines recommend CgA for monitoring', effect: { measure: 'recommendation' }, statement: 'Guidelines recommend CgA for monitoring' }), 'Guideline · Guidelines recommend CgA for monitoring: Guidelines recommend CgA for monitoring');
 });
