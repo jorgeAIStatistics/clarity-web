@@ -4,6 +4,7 @@
 import { LAYERS, coverageBand, inferMode, plainPopulation, list } from '../profile/meaningModel.js';
 import { measureFamily, describeEffect, intervalSide, validInterval, num } from '../evidence/measures.js';
 import { validRecord } from '../profile/visualModel.js';
+import { classificationRows, aucStrip } from '../evidence/graphProfile.js';
 
 export const MAP_VERSION = 'question-map-v1';
 export const DEMO = {
@@ -254,4 +255,20 @@ export function findingLine(f) {
     : [e.measure, Number.isFinite(e.estimate) ? num(e.estimate) : '', Number.isFinite(e.lower) && Number.isFinite(e.upper) ? `(${num(e.lower)} to ${num(e.upper)})` : ''].filter(Boolean).join(' ');
   const threshold = Number.isFinite(f.threshold) ? ` at a cut-off of ${num(f.threshold)}${f.threshold_unit ? ` ${f.threshold_unit}` : ''}` : '';
   return `${label} · ${f.outcome}: ${Number.isFinite(e.estimate) || e.measure === 'cut-off' ? number : f.statement || 'no number reported'}${threshold}`;
+}
+
+// Matcher findings for one heatmap cell: a typed finding appears only under the entity its own marker span names.
+export function cellFindings(example, entityId) {
+  return (example?.retrieved?.findings || []).filter(f => !Array.isArray(f.entity_ids) || !f.entity_ids.length || f.entity_ids.includes(entityId));
+}
+
+// Grounded accuracy figures for a cell: typed classification and discrimination findings that carry a source quote.
+export function cellAccuracy(examples, entityId) {
+  const rows = (examples || []).flatMap(x => cellFindings(x, entityId)
+    .filter(f => f.finding_id && f.quote && ['classification', 'discrimination'].includes(f.kind))
+    .map(f => ({
+      finding: { id: f.finding_id, kind: f.kind, measure: f.measure, estimate: f.effect?.estimate ?? null, lower: f.effect?.lower ?? null, upper: f.effect?.upper ?? null, level: f.effect?.confidence_level ?? null, unit: f.effect?.units ?? null, cutoff: f.threshold ?? null, cutoff_unit: f.threshold_unit ?? null, target: f.outcome, assay: f.assay ?? null },
+      quote: f.quote, pmid: x.pmid || (String(x.id).startsWith('pmid:') ? String(x.id).slice(5) : null), study_id: x.id,
+    })));
+  return { table: classificationRows(rows), strip: aucStrip(rows) };
 }

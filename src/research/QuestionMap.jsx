@@ -10,7 +10,8 @@ import { loadVisualSnapshot } from '../profile/useVisualReport.js';
 import { axisFor } from '../profile/visualModel.js';
 import { LAYERS, BANDS, list } from '../profile/meaningModel.js';
 import { describeEffect, measureFamily, num } from '../evidence/measures.js';
-import { DEMO, MAP_VERSION, mapFailure, readJson, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount } from './questionMap.js';
+import { DEMO, MAP_VERSION, mapFailure, readJson, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount, cellFindings, cellAccuracy } from './questionMap.js';
+import { AccuracyFigures } from '../evidence/GraphProfile.jsx';
 import { readResultTable, RESULT_ROLES } from './resultTable.js';
 import './questionMap.css';
 
@@ -136,13 +137,14 @@ function CellDrawer({ cell, onClose, estimates }) {
     <h2 id={titleId}>{cell.count ? `${cell.count} ${cell.count === 1 ? 'record' : 'records'} in this layer` : 'A gap in this layer'}</h2>
     {cell && [...new Set(estimates.filter(e => e.layer === cell.layer && e.entityIds.includes(cell.entityId)).map(e => e.outcome))].map(outcome => landscapePanels(estimates.filter(e => e.layer === cell.layer && e.entityIds.includes(cell.entityId)), outcome).map(p => <Forest key={outcome+p.key} panel={p} />))}
     <p className="qm-asks">This layer answers: {layer.asks}</p>
+    {cell.count ? <AccuracyFigures {...cellAccuracy(cell.examples, cell.entityId)} /> : null}
     {cell.count ? <>
       <p>{cell.direction ? `${DIRECTION[cell.direction][1]}: ${cell.directions.below} below, ${cell.directions.above} above, ${cell.directions.includes} including no difference.` : 'No reported intervals in these records.'} {REVIEW[cell.review]?.[1]}.</p>
       <ul className="qm-drawer-list">{cell.examples.map(x => <li key={x.id}>
         {safeSource(x.url) ? <a href={safeSource(x.url)} target="_blank" rel="noreferrer">{x.title || x.id} <ArrowUpRight size={13} aria-hidden="true" /></a> : <strong>{x.title || x.id}</strong>}
         <small>{[x.design, x.year, x.quantified ? 'has a quote-backed estimate' : null].filter(Boolean).join(' · ')}</small>
         {x.retrieved?.passage?.text && <blockquote>{x.retrieved.passage.text}</blockquote>}
-        {(x.retrieved?.findings || []).slice(0, 4).map((f, i) => <p key={i}>{findingLine(f)}</p>)}
+        {cellFindings(x, cell.entityId).slice(0, 4).map((f, i) => <p key={i}>{findingLine(f)}</p>)}
       </li>)}</ul>
       {cell.count > cell.examples.length && <p className="qm-note">Showing {cell.examples.length} of {cell.count}. The profile lists every record.</p>}
     </> : <>
@@ -286,7 +288,7 @@ export default function QuestionMap() {
           <button type="button" className="qm-button" onClick={loadDemo} disabled={busy}>Load the ApoB vs LDL-C demo</button>
           {ready && <button type="button" className="qm-button" onClick={() => setEditingQuestion(false)}>Keep the current map</button>}
         </div>
-        <p className="qm-note">Claude parses your question; Clarity retrieves from Neo4j. The full question is not stored. Unrecognized entity names may be retained temporarily for seven days. Tables are read in this browser; only their outcome names join the search. Aggregate research data only, never patient-level records. Not for personal health decisions.</p>
+        <p className="qm-note">Claude parses your question; Clarity retrieves from Neo4j. The full question text is not stored. Its parsed fields (entity names, outcome, population and setting, which are short phrases from your wording) and their links to graph entities are kept for seven days to show which topics lack evidence, then deleted. Unrecognized entity names follow the same seven-day limit. Tables are read in this browser; only their outcome names join the search. Aggregate research data only, never patient-level records. Not for personal health decisions.</p>
       </form>}
     </section>
 
