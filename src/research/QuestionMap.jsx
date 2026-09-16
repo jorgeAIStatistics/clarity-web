@@ -12,6 +12,7 @@ import { LAYERS, BANDS, list } from '../profile/meaningModel.js';
 import { describeEffect, measureFamily, num } from '../evidence/measures.js';
 import { DEMO, MAP_VERSION, mapFailure, readJson, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount, cellFindings, cellAccuracy, briefing, predictionRows, predictionReading, leadMarker, entityBriefs } from './questionMap.js';
 import { AccuracyFigures } from '../evidence/GraphProfile.jsx';
+import FindingsWorkspace from './FindingsWorkspace.jsx';
 import { readResultTable, RESULT_ROLES } from './resultTable.js';
 import './questionMap.css';
 
@@ -385,6 +386,8 @@ export default function QuestionMap() {
           </> : <p>Map a question with at least one named profile to get a suggested next step.</p>}
         </section>
       </div>
+
+      <FindingsWorkspace result={result} estimates={estimates} briefs={briefs} restatement={restatement} question={submitted} />
 
       <details className="qm-panel qm-records"><summary>Records, passages and reading path · {result.studies.length} retrieved of {result.coverage.studies.toLocaleString('en-US')} indexed</summary><CopilotResults result={result} /></details>
       <p className="qm-workspace">Need row-level inclusion decisions, dimension-by-dimension comparison and an audit trail? <a href="/explore/matcher?mode=workspace">Open the study workspace</a></p>
