@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,groupFindings,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,usageNotes,findingsCsv,findingsJson,graphPrefixes,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,LAYERS} from './graphProfile.js';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -39,6 +39,15 @@ export function AccuracyFigures({table,strip}){
   </>;
 }
 
+const EMPTY_TABLE={rows:[],columns:[]},EMPTY_STRIP={points:[],domain:[0.5,1]};
+function FindingList({rows}){
+  return <ul className="gp-findings">{rows.map(f=><li key={f.id}>
+    <div className="gp-finding-head"><strong>{valueText(f)}</strong><span>{[f.target&&`for ${f.target}`,f.population,f.setting].filter(Boolean).join(' · ')}</span></div>
+    {f.quote&&<blockquote>{f.quote}</blockquote>}
+    <small>{f.pmid&&<a href={`https://pubmed.ncbi.nlm.nih.gov/${f.pmid}/`} target="_blank" rel="noreferrer">PMID {f.pmid}</a>}{f.year?` · ${f.year}`:''}{f.layer?` · ${layerLabel(f.layer)} layer`:''} · {f.review_state==='reviewed'?'Reviewed':f.review_state==='partially_reviewed'?'Partially reviewed':'Automated reading, not expert-reviewed'}</small>
+  </li>)}</ul>;
+}
+
 const INDEX={biomarker:['/biomarkers','All biomarkers','BIOMARKERS'],diagnostic:['/diagnostics','All diagnostics','DIAGNOSTICS'],screening:['/screening','All screening','SCREENING'],precision_oncology:['/precision-medicine','All precision medicine','PRECISION MEDICINE']};
 function Hero({name,go,type='biomarker',children}){
   const heading=useRef(null);
@@ -73,73 +82,91 @@ export default function GraphProfile({slug,go,type='biomarker'}){
   if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><p>The evidence engine may be starting up. Try again in a minute.</p><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
 
   const {entity,layers,findings,related,studies,dead_letters:dead}=state.data;
-  const groups=groupFindings(findings),total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
-  const object=objectKind(entity),usage=usageNotes(entity,findings);
-  const download=(text,type,extension)=>{
-    const url=URL.createObjectURL(new Blob([text],{type}));
+  const total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
+  const q1=identity(entity,related),q2=biology(entity,findings),q3=measurement(entity,findings),q4=meaning(entity,findings),q5=utility(entity,findings);
+  const rungs=ladder(entity,findings),scope=scopeNote(entity,findings),ask=questions(type);
+  const download=(text,mime,extension)=>{
+    const url=URL.createObjectURL(new Blob([text],{type:mime}));
     const link=Object.assign(document.createElement('a'),{href:url,download:`${entity.id.replace(':','-')}-findings.${extension}`});
     document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
-  const aliases=entity.aliases.filter(a=>a!==entity.name);
   return <div className="gp">
     <Hero name={entity.name} go={go} type={type}>
-      <p className="ev-intro">What indexed publications report about {entity.name}, kept apart by evidence layer and by finding kind. Each reading comes from a quoted source passage and is automated, not expert-reviewed.</p>
+      <p className="ev-intro">{q1.text}{q1.specimen?` Measured in ${q1.specimen.toLowerCase()}.`:''} This page answers five questions in order, from what the object is to whether measuring it helps, using only findings indexed in the graph.</p>
       <dl className="gp-identity">
-        {aliases.length>0&&<div><dt>Also written as</dt><dd>{aliases.join(' · ')}</dd></div>}
+        {q1.aliases.length>0&&<div><dt>Also written as</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
         <div><dt>Linked publications</dt><dd>{studies}</dd></div>
         <div><dt>Typed findings</dt><dd>{total}</dd></div>
         {Object.entries(entity.external_ids||{}).map(([k,v])=><div key={k}><dt>{k.toUpperCase()}</dt><dd>{v}</dd></div>)}
       </dl>
     </Hero>
 
-    <section className="gp-section" aria-labelledby="gp-what">
-      <div className="gp-section-head"><h2 id="gp-what">What this is, and what it can be used for</h2><p className="ev-note">Derived from the finding kinds actually indexed here, not from what the marker is known for elsewhere.</p></div>
-      <div className="gp-what">
-        <div><h3>{object.label}</h3><p>{object.text}</p></div>
-        <div><h3>You can use what is indexed to…</h3>{usage.empty
-          ? <p>Nothing yet: no typed finding is indexed for {entity.name}, so this page supports no claim about it.</p>
-          : <ul>{usage.may.map(u => <li key={u.kind}>{u.text}</li>)}</ul>}</div>
-        <div><h3>Not supported by this page</h3><ul>{usage.empty
-          ? <li>Absence here is absence of indexing, not evidence that {entity.name} is uninformative.</li>
-          : usage.mustNot.map(u => <li key={u.kind}>{u.text}</li>)}</ul></div>
-      </div>
+    <section className="gp-section" aria-labelledby="gp-ladder-title">
+      <div className="gp-section-head"><h2 id="gp-ladder-title">How far the evidence goes</h2><p className="ev-note">A rung is indexed only when a finding in this graph speaks to it. Not indexed means Clarity holds nothing, not that nothing exists.</p></div>
+      <ol className="gp-ladder">{rungs.map(r=><li key={r.key} data-indexed={r.indexed}>
+        <span>{r.label}</span><strong>{r.indexed?'Indexed':'Not indexed'}</strong><small>{r.asks}</small>
+      </li>)}</ol>
     </section>
 
-    <section className="gp-section" aria-labelledby="gp-layers">
-      <div className="gp-section-head"><h2 id="gp-layers">Evidence by layer</h2><p className="ev-note">A gap means no typed finding is indexed for that layer yet. It is a gap in Clarity's library, not evidence that none exist.</p></div>
-      <ul className="gp-layers">{layers.map(l=><li key={l.layer} className="gp-layer" data-state={l.n_findings>0?'findings':'gap'}>
-        <div className="gp-layer-top"><span>{layerLabel(l.layer)}</span><strong>{l.n_findings>0?`${l.n_findings} ${l.n_findings===1?'finding':'findings'}`:'Gap'}</strong></div>
-        {l.sentences.map(s=><p key={s}>{s}</p>)}
-      </li>)}</ul>
+    <section className="gp-q" aria-labelledby="gp-q1">
+      <h2 id="gp-q1"><em>Q1</em>{ask[0]}</h2>
+      <p className="gp-lead">{q1.text}</p>
+      {!q1.curated&&<p className="ev-note">No curated class is stored for this entity yet, so this is the generic description for its kind.</p>}
+      <dl className="gp-facts">
+        <div><dt>Class</dt><dd>{q1.label}</dd></div>
+        {q1.specimen&&<div><dt>Specimen</dt><dd>{q1.specimen}</dd></div>}
+        {q1.aliases.length>0&&<div><dt>Aliases</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
+      </dl>
+      {q1.molecular.length>0&&<>
+        <p className="ev-note">Gene, protein and variant are separate entities here. A finding about one is never attached to another.</p>
+        <ul className="gp-related">{q1.molecular.map(r=><li key={r.edge+r.id}><span>{relationLabel(r)}</span>{/^(biomarker|variant|gene|protein):/.test(r.id)?<Link to={`/biomarkers/${r.id.split(':')[1]}`} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}<small>{r.kind}</small></li>)}</ul>
+      </>}
     </section>
 
-    {groups.length>0&&<section className="gp-section" aria-labelledby="gp-findings">
-      <div className="gp-section-head"><h2 id="gp-findings">Findings by kind</h2><p className="ev-note">Association, discrimination, classification and clinical utility answer different questions. None of them implies the next.</p></div>
-      <AccuracyFigures table={table} strip={strip}/>
-      <p className="gp-export">{total>0
-        ? <>Take the findings with you: <button type="button" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button> <button type="button" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button> <span className="ev-note">One row per finding, with its passage, source and review state.</span></>
-        : null}</p>
-      {groups.map(g=><div className="gp-kind" key={g.kind}>
-        <h3>{g.label}<span>{g.rows.length}</span></h3><p className="ev-note">{g.note}</p>
-        <ul className="gp-findings">{g.rows.map(f=><li key={f.id}>
-          <div className="gp-finding-head"><strong>{valueText(f)}</strong><span>{[f.target&&`for ${f.target}`,f.population,f.setting].filter(Boolean).join(' · ')}</span></div>
-          {f.quote&&<blockquote>{f.quote}</blockquote>}
-          <small>{f.pmid&&<a href={`https://pubmed.ncbi.nlm.nih.gov/${f.pmid}/`} target="_blank" rel="noreferrer">PMID {f.pmid}</a>}{f.year?` · ${f.year}`:''}{f.layer?` · ${layerLabel(f.layer)} layer`:''} · {f.review_state==='reviewed'?'Reviewed':f.review_state==='partially_reviewed'?'Partially reviewed':'Automated reading, not expert-reviewed'}</small>
-        </li>)}</ul>
+    <section className="gp-q" aria-labelledby="gp-q2">
+      <h2 id="gp-q2"><em>Q2</em>{ask[1]}</h2>
+      {q2.state==='background'&&<p className="gp-badge">Background, not a finding</p>}
+      <p className="gp-lead">{q2.text}</p>
+      {q2.findings.length>0&&<FindingList rows={q2.findings}/>}
+      {q2.state==='indexed'&&q2.note&&<p className="ev-note">Background: {q2.note}</p>}
+    </section>
+
+    <section className="gp-q" aria-labelledby="gp-q3">
+      <h2 id="gp-q3"><em>Q3</em>{ask[2]}</h2>
+      <p className="gp-lead" data-gap={q3.gap||undefined}>{q3.text}</p>
+      <dl className="gp-facts">
+        {q3.assays.length>0&&<div><dt>Assays named</dt><dd>{q3.assays.join(' · ')}</dd></div>}
+        {q3.units.length>0&&<div><dt>Units reported</dt><dd>{q3.units.join(' · ')}</dd></div>}
+        {q3.method&&<div><dt>Usual method</dt><dd>{q3.method} <span className="ev-note">(background)</span></dd></div>}
+      </dl>
+    </section>
+
+    <section className="gp-q" aria-labelledby="gp-q4">
+      <h2 id="gp-q4"><em>Q4</em>{ask[3]}</h2>
+      {scope&&<p className="gp-scope">{scope}</p>}
+      {q4.length===0&&<p className="gp-lead">No typed finding is indexed for {entity.name}, so this page supports no claim about what its value indicates.</p>}
+      {q4.map(g=><div className="gp-kind" key={g.kind}>
+        <h3>{g.label}<span>{g.rows.length}</span></h3>
+        {g.sentences.map(sentence=><p className="gp-meaning" key={sentence}>{sentence}</p>)}
+        {g.kind==='classification'&&<AccuracyFigures table={table} strip={EMPTY_STRIP}/>}
+        {g.kind==='discrimination'&&<AccuracyFigures table={EMPTY_TABLE} strip={strip}/>}
+        <FindingList rows={g.rows}/>
       </div>)}
-    </section>}
+      {total>0&&<p className="gp-export">Take the findings with you: <button type="button" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button> <button type="button" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button> <span className="ev-note">One row per finding, with its passage, source and review state.</span></p>}
+    </section>
 
-    {related.length>0&&<section className="gp-section" aria-labelledby="gp-related">
-      <div className="gp-section-head"><h2 id="gp-related">Molecular identity</h2><p className="ev-note">Genes, proteins and variants are separate entities. A finding about one is not attached to another.</p></div>
-      <ul className="gp-related">{related.map(r=><li key={r.edge+r.id}><span>{relationLabel(r)}</span>{/^(biomarker|variant):/.test(r.id)?<Link to={`/biomarkers/${r.id.split(':')[1]}`} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}<small>{r.kind}</small></li>)}</ul>
-    </section>}
+    <section className="gp-q" aria-labelledby="gp-q5">
+      <h2 id="gp-q5"><em>Q5</em>{ask[4]}</h2>
+      <p className="gp-lead" data-gap={q5.state==='empty'||undefined}>{q5.text}</p>
+      {q5.rows.length>0&&<FindingList rows={q5.rows}/>}
+    </section>
 
     {dead.length>0&&<details className="gp-dead"><summary>{dead.length} extraction {dead.length===1?'attempt':'attempts'} produced no typed finding</summary>
       <ul>{dead.map(d=><li key={`${d.pmid}-${d.at}`}>{d.pmid?`PMID ${d.pmid}`:'Source'}: {deadLetterText(d)}.</li>)}</ul>
       <p className="ev-note">Recorded so the next extraction pass knows why. A rejected passage is not evidence against {entity.name}.</p>
     </details>}
 
-    <p className="ev-note gp-foot">Automated graph profile built from published abstracts. It describes what studies report and is not a clinical decision or individual risk tool.</p>
+    <p className="ev-note gp-foot">Automated graph profile built from published abstracts, with curated identity text marked as background. It describes what studies report and is not a clinical decision or individual risk tool.</p>
   </div>;
 }
 

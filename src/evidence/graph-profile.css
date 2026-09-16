@@ -54,3 +54,25 @@
 .gp-export button{min-height:40px;padding:8px 14px}
 .gp-export .ev-note{flex-basis:100%;margin:0}
 @media(max-width:900px){.gp-what{grid-template-columns:1fr}}
+
+.gp-ladder{list-style:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:0;padding:0;counter-reset:rung}
+.gp-ladder li{border:1px solid var(--border);border-radius:10px;padding:13px 14px;background:#111722;display:flex;flex-direction:column;gap:4px;min-width:0}
+.gp-ladder li[data-indexed=true]{border-color:#35685e;background:#10201d}
+.gp-ladder li[data-indexed=false]{border-style:dashed;background:transparent}
+.gp-ladder span{font:10px ui-monospace,monospace;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted)}
+.gp-ladder strong{font-size:14px;font-weight:550;color:#e8eef7}
+.gp-ladder li[data-indexed=false] strong{color:var(--muted);font-weight:450}
+.gp-ladder small{font-size:11.5px;color:var(--muted);line-height:1.5}
+.gp-q{margin:0 0 42px;min-width:0;scroll-margin-top:16px}
+.gp-q>h2{display:flex;align-items:baseline;gap:12px;font-size:23px;font-weight:550;letter-spacing:-.4px;margin:0 0 12px;text-wrap:balance}
+.gp-q>h2 em{font:600 11px/1 ui-monospace,monospace;letter-spacing:1.5px;color:#0a0d14;background:var(--accent);border-radius:5px;padding:6px 7px;font-style:normal}
+.gp-lead{font-size:16px;line-height:1.65;color:#d3dde9;max-width:82ch;margin:0 0 12px}
+.gp-lead[data-gap]{border-left:2px solid #c6a15a;padding-left:14px;color:#e6d6b6}
+.gp-badge{display:inline-block;font:10px ui-monospace,monospace;letter-spacing:1.1px;text-transform:uppercase;color:#d8c48a;border:1px solid #6b5a30;background:#231d10;border-radius:5px;padding:5px 8px;margin:0 0 10px}
+.gp-facts{display:flex;flex-wrap:wrap;gap:4px 40px;margin:0 0 12px}
+.gp-facts>div{min-width:0;max-width:100%}
+.gp-facts dt{margin-top:0}
+.gp-meaning{font-size:14.5px;line-height:1.65;color:#b7c4d8;max-width:82ch;margin:0 0 8px}
+.gp-scope{font-size:13.5px;line-height:1.6;color:#e6d6b6;border-left:2px solid #6b5a30;padding-left:14px;margin:0 0 18px;max-width:82ch}
+@media(max-width:1100px){.gp-ladder{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){.gp-ladder{grid-template-columns:1fr}.gp-q>h2{font-size:20px}}

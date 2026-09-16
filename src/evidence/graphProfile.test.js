@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,usageNotes,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS} from './graphProfile.js';
+import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions} from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -63,18 +63,6 @@ test('the page states what the object is and keeps gene, variant and protein apa
   assert.equal(objectKind({}).label, 'Entity');
 });
 
-test('permitted uses come from the finding kinds present, and utility is never assumed', () => {
-  const usage = usageNotes({ name: 'Chromogranin A', kind: 'Biomarker' }, [row(sens), row(auc)]);
-  assert.deepEqual(usage.may.map(u => u.kind), ['classification', 'discrimination']);
-  assert.equal(usage.mustNot[0].kind, 'utility');
-  assert.match(usage.mustNot[0].text, /Nothing indexed here shows that measuring Chromogranin A changes decisions/);
-  assert.ok(usage.mustNot.some(u => /cut-off to another assay/.test(u.text)));
-  const empty = usageNotes({ name: 'CA-125', kind: 'Biomarker' }, []);
-  assert.deepEqual([empty.empty, empty.may, empty.mustNot], [true, [], []]);
-  const variant = usageNotes({ name: 'EGFR activating mutation', kind: 'Variant' }, [row(hr)]);
-  assert.ok(variant.mustNot.some(u => u.kind === 'identity' && /whole gene/.test(u.text)));
-});
-
 test('findings export as one row per finding with quotes escaped', () => {
   const entity = { id: 'biomarker:chromogranin-a', name: 'Chromogranin A' };
   const csv = findingsCsv(entity, [row(sens), row(spec), row(sens)]);
@@ -98,4 +86,84 @@ test('each index route resolves only its own kinds', () => {
   assert.deepEqual(routeTypes('tests'), ['diagnostic', 'screening']);
   assert.deepEqual(routeTypes('precision-medicine'), ['precision_oncology']);
   assert.deepEqual(routeTypes('explore'), []);
+});
+
+// Fixtures mirror what the graph actually holds for these two pages.
+const IL18 = {
+  entity: { id: 'biomarker:il-18', name: 'IL-18', kind: 'Biomarker', aliases: ['IL-18', 'Interleukin-18'],
+    identity: { entity_class: 'Cytokine (IL-1 family protein)', specimen: 'Serum or plasma', measured_by_methods: 'Immunoassay (ELISA)',
+      pathway_note: 'Interleukin-18 is an IL-1 family cytokine released after inflammasome activation; it drives interferon-γ production.' } },
+  rows: [
+    { finding: { id: 'a1', kind: 'association', measure: 'odds_ratio', estimate: 25.6, target: 'clinical disease activity', population: 'biologic-naive patients with SD', assay: 'Plasma IL-18 levels' }, layer: 'observational', quote: 'odds ratio 25.6', pmid: '41399151' },
+    { finding: { id: 'a2', kind: 'association', measure: 'median', estimate: 61425, unit: 'pg/mL', target: 'active disease', population: 'biologic-naive patients with SD', assay: 'Plasma IL-18 levels' }, layer: 'observational', quote: 'Median baseline IL-18 levels were 61,425 pg/mL', pmid: '41399151' },
+    { finding: { id: 'd1', kind: 'discrimination', measure: 'auc', estimate: 0.92, target: 'chronic-persistent course', population: 'biologic-naive patients with SD', assay: 'Plasma IL-18 levels' }, layer: 'observational', quote: 'AUC 0.92', pmid: '41399151' },
+    { finding: { id: 'd2', kind: 'discrimination', measure: 'auc', estimate: 0.73, target: 'MAS development within 24 months', population: 'biologic-naive patients with SD', assay: 'Plasma IL-18 levels' }, layer: 'observational', quote: 'AUC 0.73', pmid: '41399151' },
+  ],
+};
+const CA125 = {
+  entity: { id: 'biomarker:ca-125', name: 'CA-125', kind: 'Biomarker', aliases: ['CA-125', 'CA125'],
+    identity: { entity_class: 'Glycoprotein antigen (MUC16 protein)', specimen: 'Serum', pathway_note: 'CA-125 is the MUC16 mucin shed by coelomic epithelium; it rises with peritoneal irritation of any cause.' } },
+  rows: [
+    { finding: { id: 'c1', kind: 'classification', measure: 'sensitivity', estimate: 79, unit: '%', cutoff: 35, cutoff_unit: 'U/mL', target: 'ovarian malignancy', population: 'women with an adnexal mass' }, layer: 'observational', quote: 'sensitivity of 79%', pmid: '40590284' },
+  ],
+};
+
+test('Q1 names the class from curated identity, not the generic kind sentence', () => {
+  const q1 = identity(IL18.entity, [{ edge: 'ENCODED_BY', id: 'gene:il18', name: 'IL18 gene', kind: 'Gene', outgoing: true }]);
+  assert.equal(q1.label, 'Cytokine (IL-1 family protein)');
+  assert.match(q1.text, /IL-18 is a cytokine \(il-1 family protein\)\./i);
+  assert.equal(q1.specimen, 'Serum or plasma');
+  assert.deepEqual(q1.molecular.map(m => m.id), ['gene:il18']);
+  assert.doesNotMatch(q1.text, /a quantity measured in a sample/i);
+  assert.equal(identity({ kind: 'Biomarker', name: 'X' }).curated, false);
+});
+
+test('Q2 separates indexed mechanism findings from curated background and from silence', () => {
+  assert.equal(biology(IL18.entity, IL18.rows).state, 'background');
+  assert.match(biology(IL18.entity, IL18.rows).text, /inflammasome/);
+  const withMechanism = biology(IL18.entity, [...IL18.rows, { finding: { id: 'm1', kind: 'association' }, layer: 'mechanism', quote: 'in vitro' }]);
+  assert.equal(withMechanism.state, 'indexed');
+  const bare = biology({ name: 'CA-125' }, []);
+  assert.deepEqual([bare.state, /Biology not indexed/.test(bare.text)], ['empty', true]);
+});
+
+test('Q3 reports the assay, and names a missing assay as the analytical-validity gap', () => {
+  const q3 = measurement(IL18.entity, IL18.rows);
+  assert.deepEqual(q3.assays, ['Plasma IL-18 levels']);
+  assert.equal(q3.gap, false);
+  const noAssay = measurement(CA125.entity, CA125.rows);
+  assert.equal(noAssay.gap, true);
+  assert.match(noAssay.text, /analytical-validity gap/);
+});
+
+test('Q4 computes one subhead per kind present, and IL-18 does not read like CA-125', () => {
+  const il18 = meaning(IL18.entity, IL18.rows);
+  assert.deepEqual(il18.map(s => s.kind), ['discrimination', 'association']);
+  const text = il18.flatMap(s => s.sentences).join(' ');
+  assert.match(text, /odds ratio 25.6/);
+  assert.match(text, /median 61,425 pg\/mL for active disease/);
+  assert.match(text, /AUC 0.73 to 0.92/);
+  assert.match(text, /overlap/i);
+  assert.ok(il18.every(s => s.sentences.length <= 3));
+  const ca125 = meaning(CA125.entity, CA125.rows).flatMap(s => s.sentences).join(' ');
+  assert.match(ca125, /cut-off \(35 U\/mL\)/);
+  assert.notEqual(text, ca125);
+  assert.doesNotMatch(text, /CA-125/);
+});
+
+test('Q5 never infers utility, and the ladder marks each rung', () => {
+  const q5 = utility(IL18.entity, IL18.rows);
+  assert.equal(q5.state, 'empty');
+  assert.match(q5.text, /No indexed evidence that measuring IL-18 changes decisions or outcomes/);
+  const rungs = Object.fromEntries(ladder(IL18.entity, IL18.rows).map(r => [r.key, r.indexed]));
+  assert.deepEqual(rungs, { discovery: true, biology: false, analytical: true, clinical: true, incremental: false, utility: false });
+  assert.deepEqual(ladder({}, []).map(r => r.indexed), [false, false, false, false, false, false]);
+});
+
+test('scope note names the population the evidence came from, and the questions follow the route', () => {
+  assert.match(scopeNote(IL18.entity, IL18.rows), /Indexed evidence is currently from biologic-naive patients with SD/);
+  assert.equal(scopeNote(IL18.entity, []), null);
+  assert.equal(questions('precision_oncology')[3], 'Is it prognostic, or predictive of treatment benefit?');
+  assert.equal(questions('diagnostic')[4], 'Does using the test change outcomes or harms?');
+  assert.equal(questions('anything')[0], 'What is it?');
 });

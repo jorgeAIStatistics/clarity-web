@@ -146,19 +146,6 @@ const IDENTITY_LIMITS={
   Protein:'Do not read protein-level findings as gene or transcript findings.',
 };
 
-// Uses are derived only from the finding kinds actually indexed; with no findings, nothing is licensed.
-export function usageNotes(entity={},rows=[]){
-  const kinds=[...new Set(flatten(rows).map(f=>f.kind).filter(Boolean))];
-  const order=k=>KINDS.indexOf(k);
-  const present=kinds.filter(k=>MAY[k]).sort((a,b)=>order(a)-order(b));
-  const may=present.map(k=>({kind:k,text:MAY[k]}));
-  const mustNot=present.filter(k=>MUST_NOT[k]).map(k=>({kind:k,text:MUST_NOT[k]}));
-  if(present.length&&!present.includes('utility'))mustNot.unshift({kind:'utility',text:`Nothing indexed here shows that measuring ${entity.name||'this marker'} changes decisions or outcomes; no clinical-utility finding is recorded.`});
-  const identity=IDENTITY_LIMITS[entity.kind];
-  if(identity)mustNot.push({kind:'identity',text:identity});
-  return {may,mustNot,empty:!present.length};
-}
-
 // ---- Export ---------------------------------------------------------------
 export const EXPORT_COLUMNS=['entity_id','entity_name','finding_id','kind','measure','estimate','lower','upper','interval_level','unit','cutoff','cutoff_unit','assay','target','population','setting','comparator','p_value','p_operator','layer','review_state','pmid','year','title','quote'];
 const csvCell=v=>{const t=v==null?'':String(v);return /[",\n]/.test(t)?`"${t.replaceAll('"','""')}"`:t;};
@@ -178,3 +165,142 @@ export const ROUTE_PREFIXES={biomarker:['biomarker','variant','gene','protein','
 export const ROUTE_TYPES={biomarkers:['biomarker'],diagnostics:['diagnostic'],screening:['screening'],tests:['diagnostic','screening'],'precision-medicine':['precision_oncology']};
 export const graphPrefixes=type=>ROUTE_PREFIXES[type]||ROUTE_PREFIXES.biomarker;
 export const routeTypes=root=>ROUTE_TYPES[root]||[];
+
+// ---- The profile contract: Q1-Q5 and the evidence ladder ------------------
+// Every sentence is computed from THIS entity's identity fields and its own findings. Two markers
+// with different findings must not read alike, and nothing here infers utility from accuracy.
+export const CONTRACT={
+  biomarker:['What is it?','What biology does it represent?','Can we measure it reliably?','What does the value indicate?','Does measuring it actually help?'],
+  diagnostic:['What is this test?','What does it detect?','How reliable is the measurement or reading?','How accurate is it, and in whom?','Does using the test change outcomes or harms?'],
+  screening:['What is this screening test?','What does it look for?','How reliable is the measurement or reading?','How accurate is it, and in whom?','Does screening change outcomes and harms?'],
+  precision_oncology:['What is the modifier?','What biology does the modifier represent?','How is the modifier measured?','Is it prognostic, or predictive of treatment benefit?','Does selecting treatment on it improve outcomes?'],
+};
+export const questions=type=>CONTRACT[type]||CONTRACT.biomarker;
+
+const uniq=values=>[...new Set(values.filter(Boolean))];
+const listWords=items=>{const x=uniq(items);return x.length<=1?(x[0]||''):x.length===2?`${x[0]} and ${x[1]}`:`${x.slice(0,-1).join(', ')} and ${x.at(-1)}`;};
+const range=values=>{const lo=Math.min(...values),hi=Math.max(...values);return lo===hi?num(lo):`${num(lo)} to ${num(hi)}`;};
+// Prose names a ratio in full; the short label belongs in a table, not a sentence.
+const LONG_MEASURES={odds_ratio:'odds ratio',hazard_ratio:'hazard ratio',risk_ratio:'risk ratio',rate_ratio:'rate ratio',correlation:'correlation'};
+
+// Q1: what the object is. Curated class and specimen first; the generic kind sentence is the fallback.
+export function identity(entity={},related=[]){
+  const id=entity.identity||{};
+  const molecular=related.filter(r=>['ENCODED_BY','VARIANT_OF','IN_PATHWAY','MEASURED_BY'].includes(r.edge));
+  return {
+    label:id.entity_class||objectKind(entity).label,
+    curated:Boolean(id.entity_class),
+    text:id.entity_class?`${entity.name} is ${/^[aeiou]/i.test(id.entity_class)?'an':'a'} ${id.entity_class.toLowerCase()}.`:objectKind(entity).text,
+    specimen:id.specimen||null,
+    aliases:(entity.aliases||[]).filter(a=>a!==entity.name),
+    molecular,
+    note:objectKind(entity).text,
+  };
+}
+
+// Q2: biology. Mechanism or preclinical findings are evidence; a curated note is background.
+export function biology(entity={},rows=[]){
+  const indexed=flatten(rows).filter(f=>['mechanism','preclinical'].includes(f.layer));
+  const note=(entity.identity||{}).pathway_note||null;
+  if(indexed.length)return {state:'indexed',text:`${indexed.length} indexed mechanism or laboratory ${indexed.length===1?'finding':'findings'} for ${entity.name}.`,note,findings:indexed};
+  if(note)return {state:'background',text:note,note:null,findings:[]};
+  return {state:'empty',text:`Biology not indexed: no mechanism or laboratory finding for ${entity.name} is in the graph, and no background note is stored.`,note:null,findings:[]};
+}
+
+// Q3: can it be measured reliably. Assays named in the findings themselves, then the curated method.
+export function measurement(entity={},rows=[]){
+  const list=flatten(rows);
+  const assays=uniq(list.map(f=>f.assay));
+  const units=uniq(list.map(f=>f.cutoff_unit||f.unit));
+  const method=(entity.identity||{}).measured_by_methods||null;
+  const specimen=(entity.identity||{}).specimen||null;
+  const gap=list.length>0&&assays.length===0;
+  return {
+    assays,units,method,specimen,gap,
+    text:gap?`No indexed finding names the assay it used. Without the assay, platform and matrix, these values cannot be compared across studies or carried to a laboratory report — that is an analytical-validity gap, not a detail.`
+      :assays.length?`Assays named in the indexed findings: ${listWords(assays)}.${units.length?` Reported in ${listWords(units)}.`:''} Values from different assays are not interchangeable unless the studies calibrated them.`
+      :method?`No finding is indexed yet, so nothing here demonstrates analytical validity. ${method} is the usual method recorded for this entity.`
+      :`Nothing is indexed about how ${entity.name} is measured.`,
+  };
+}
+
+const KIND_MEANING={
+  association:(name,group)=>{
+    const ratios=group.filter(f=>LONG_MEASURES[f.measure]&&f.estimate!=null);
+    const others=group.filter(f=>!ratios.includes(f));
+    const parts=[];
+    if(ratios.length)parts.push(`${name} was associated with ${listWords(ratios.map(f=>f.target))} (${listWords(ratios.map(f=>`${LONG_MEASURES[f.measure]} ${num(f.estimate)}`))})`);
+    // Lower-case the leading measure word only: units such as pg/mL and labels such as AUC keep their case.
+    const lead=text=>String(text).replace(/^[A-Z][a-z]+/,w=>w.toLowerCase());
+    if(others.length)parts.push(`${ratios.length?'Levels reported as ':`${name} was reported as `}${listWords(others.map(f=>`${lead(valueText(f))} for ${f.target}`))}`);
+    return [`${parts.join('. ')}.`,
+      'An association is not causation: the studies did not change the marker and watch the outcome.',
+      'Group values can overlap almost completely even when their averages differ, so a difference that is biologically interesting can still be useless for telling two people apart.'];
+  },
+  discrimination:(name,group)=>{
+    const values=group.filter(f=>f.estimate!=null).map(f=>f.estimate);
+    return [`Reported discrimination for ${listWords(group.map(f=>f.target))}: ${MEASURES[group[0].measure]||'AUC'} ${values.length?range(values):'not stated'} on a scale where 0.5 is chance.`,
+      'Discrimination describes how well the marker ranks people inside that study\u2019s own sample. It is not calibration, and it does not show that any decision changed.',
+      'Even a high value leaves overlapping distributions: some people above the cut-off do not have the condition, and some below it do.'];
+  },
+  classification:(name,group)=>{
+    const cut=uniq(group.map(f=>f.cutoff!=null?`${num(f.cutoff)}${f.cutoff_unit?` ${f.cutoff_unit}`:''}`:null));
+    return [`At the authors\u2019 own cut-off${cut.length?` (${listWords(cut)})`:''}, the indexed studies report ${listWords(group.map(f=>`${MEASURES[f.measure]||f.measure} ${num(f.estimate)}${f.unit==='%'?'%':''}`))} for ${listWords(group.map(f=>f.target))}.`,
+      'A cut-off is a property of the study that chose it: another assay, spectrum of disease or population moves it.',
+      'Sensitivity and specificity say nothing about how many positives are true in your setting; that depends on how common the condition is there.'];
+  },
+  prognosis:(name,group)=>[
+    `${name} was reported against later course — ${listWords(group.map(f=>f.target))} — as ${listWords(group.map(f=>valueText(f)))}.`,
+    'Prognostic is not predictive: knowing who does worse is not evidence about who benefits from a treatment, which needs a treatment-by-marker interaction.'],
+  effect:(name,group)=>[
+    `Between-group comparisons: ${listWords(group.map(f=>valueText(f)))} for ${listWords(group.map(f=>f.target))}.`,
+    'The contrast, dose and population belong to the study that reported it and do not transfer unchanged.'],
+};
+
+// Q4: what the value indicates, one subhead per kind that actually exists.
+export function meaning(entity={},rows=[]){
+  const name=entity.name||'This marker';
+  return groupFindings(rows).filter(g=>KIND_MEANING[g.kind]).map(g=>({
+    kind:g.kind,label:g.label,rows:g.rows,
+    sentences:KIND_MEANING[g.kind](name,g.rows).slice(0,3),
+  }));
+}
+
+// Q5: does measuring it help. Utility and guidelines only, never inferred from accuracy.
+export function utility(entity={},rows=[]){
+  const list=flatten(rows);
+  const useful=list.filter(f=>f.kind==='utility');
+  const guidance=list.filter(f=>f.kind==='guideline');
+  if(!useful.length&&!guidance.length)return {state:'empty',rows:[],
+    text:`No indexed evidence that measuring ${entity.name} changes decisions or outcomes. Nothing on this page — association, accuracy or discrimination — can stand in for that evidence.`};
+  return {state:'indexed',rows:[...useful,...guidance],
+    text:`${useful.length?`${useful.length} indexed clinical-utility ${useful.length===1?'finding':'findings'}`:'No indexed clinical-utility finding'}${guidance.length?` and ${guidance.length} guideline ${guidance.length===1?'statement':'statements'}`:''} for ${entity.name}. Read each one for the decision it actually tested.`};
+}
+
+// The ladder: which rungs the graph can speak to at all.
+export const RUNGS=['discovery','biology','analytical','clinical','incremental','utility'];
+const RUNG_LABELS={discovery:'Discovery',biology:'Biology',analytical:'Analytical validation',clinical:'Clinical validation',incremental:'Incremental value',utility:'Clinical utility'};
+const RUNG_ASKS={discovery:'Is it reported at all?',biology:'Is there a mechanism or laboratory finding?',analytical:'Do the findings name an assay?',clinical:'Association, discrimination, classification or prognosis?',incremental:'Does it add to the tools already in use?',utility:'Does using it change decisions or outcomes?'};
+const INCREMENTAL=/\badded to\b|\bincremental\b|\bbeyond\b|\bin addition to\b|\bcombined with\b|\bversus\b/i;
+export function ladder(entity={},rows=[]){
+  const list=flatten(rows);
+  const has=kinds=>list.some(f=>kinds.includes(f.kind));
+  const state={
+    discovery:list.length>0,
+    biology:list.some(f=>['mechanism','preclinical'].includes(f.layer)),
+    analytical:list.some(f=>f.assay),
+    clinical:has(['association','discrimination','classification','prognosis','effect']),
+    incremental:list.some(f=>f.measure==='delta_c_index'||INCREMENTAL.test(`${f.target||''} ${f.marker||''} ${f.comparator||''}`)),
+    utility:has(['utility','guideline']),
+  };
+  return RUNGS.map(key=>({key,label:RUNG_LABELS[key],asks:RUNG_ASKS[key],indexed:state[key]}));
+}
+
+// What the indexed evidence is actually about, so a reader does not take it for the general case.
+export function scopeNote(entity={},rows=[]){
+  const list=flatten(rows);
+  if(!list.length)return null;
+  const where=uniq(list.map(f=>f.population||f.setting)).slice(0,3);
+  if(!where.length)return `Indexed findings do not state the population they came from, so their scope is unknown.`;
+  return `Indexed evidence is currently from ${listWords(where)}. Other uses of ${entity.name} are not indexed here, and absence is not evidence against them.`;
+}
