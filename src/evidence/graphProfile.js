@@ -223,7 +223,7 @@ export function measurement(entity={},rows=[]){
   const list=flatten(rows);
   const assays=uniq(list.map(f=>f.assay));
   const units=uniq(list.map(f=>f.cutoff_unit||f.unit));
-  const method=(entity.identity||{}).measured_by_methods||null;
+  const method=(entity.identity||{}).assay_hint||null;
   const specimen=(entity.identity||{}).specimen||null;
   const gap=list.length>0&&assays.length===0;
   return {
@@ -363,4 +363,27 @@ export async function fetchWithRetry(attemptOnce,{delays=RETRY_DELAYS,sleep,onRe
       await wait(delays[tries]);
     }
   }
+}
+
+// ---- External identifiers -------------------------------------------------
+// A nickname is not an identity. Each id links to the registry that issued it, and the caption
+// says what the id is for: a variant's ids describe the gene it alters, not the variant.
+const ID_SOURCES={
+  hgnc:['HGNC','gene',id=>`https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/${encodeURIComponent(id)}`],
+  ensembl:['Ensembl','gene',id=>`https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${encodeURIComponent(id)}`],
+  uniprot:['UniProt','protein',id=>`https://www.uniprot.org/uniprotkb/${encodeURIComponent(id)}`],
+  mondo:['MONDO','disease',id=>`https://www.ebi.ac.uk/ols4/ontologies/mondo/classes?short_form=${encodeURIComponent(String(id).replace(':','_'))}`],
+  chebi:['ChEBI','molecule',id=>`https://www.ebi.ac.uk/chebi/searchId.do?chebiId=${encodeURIComponent(id)}`],
+  ncit:['NCIt','concept',id=>`https://ncithesaurus.nci.nih.gov/ncitbrowser/ConceptReport.jsp?code=${encodeURIComponent(id)}`],
+};
+export function externalLinks(entity={}){
+  const ids=entity.external_ids||{};
+  return Object.entries(ID_SOURCES).filter(([key])=>ids[key]).map(([key,[label,about,url]])=>({key,label,about,id:ids[key],url:url(ids[key])}));
+}
+export function idCaption(entity={}){
+  const kind=entity.kind||entity.type;
+  if(kind==='Variant'||kind==='variant')return 'These identify the gene and protein this variant alters. The variant itself is a separate object.';
+  if(kind==='PrecisionContext'||kind==='precision_context')return 'These identify the gene at the centre of this marker-and-treatment pair.';
+  if(kind==='Gene'||kind==='gene')return 'Gene identifiers. The protein and any variant of it are separate objects here.';
+  return 'These identify the gene that encodes it and the protein that is measured.';
 }

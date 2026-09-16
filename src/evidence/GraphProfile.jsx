@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,LAYERS} from './graphProfile.js';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -125,7 +125,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
   const {entity,layers,findings,related,studies,dead_letters:dead}=state.data;
   const total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
   const q1=identity(entity,related),q2=biology(entity,findings),q3=measurement(entity,findings),q4=meaning(entity,findings),q5=utility(entity,findings);
-  const rungs=ladder(entity,findings),scope=scopeNote(entity,findings),ask=questions(type);
+  const rungs=ladder(entity,findings),scope=scopeNote(entity,findings),ask=questions(type),links=externalLinks(entity);
   const download=(text,mime,extension)=>{
     const url=URL.createObjectURL(new Blob([text],{type:mime}));
     const link=Object.assign(document.createElement('a'),{href:url,download:`${entity.id.replace(':','-')}-findings.${extension}`});
@@ -138,7 +138,6 @@ export default function GraphProfile({slug,go,type='biomarker'}){
         {q1.aliases.length>0&&<div><dt>Also written as</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
         <div><dt>Linked publications</dt><dd>{studies}</dd></div>
         <div><dt>Typed findings</dt><dd>{total}</dd></div>
-        {Object.entries(entity.external_ids||{}).map(([k,v])=><div key={k}><dt>{k.toUpperCase()}</dt><dd>{v}</dd></div>)}
       </dl>
     </Hero>
 
@@ -161,6 +160,10 @@ export default function GraphProfile({slug,go,type='biomarker'}){
         {q1.specimen&&<div><dt>Specimen</dt><dd>{q1.specimen}</dd></div>}
         {q1.aliases.length>0&&<div><dt>Aliases</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
       </dl>
+      {links.length>0&&<div className="gp-ids">
+        <ul>{links.map(link=><li key={link.key}><a href={link.url} target="_blank" rel="noreferrer">{link.label} {link.id}</a><small>{link.about}</small></li>)}</ul>
+        <p className="ev-note">{idCaption(entity)}</p>
+      </div>}
       {q1.molecular.length>0&&<>
         <p className="ev-note">Gene, protein and variant are separate entities here. A finding about one is never attached to another.</p>
         <ul className="gp-related">{q1.molecular.map(r=><li key={r.edge+r.id}><span>{relationLabel(r)}</span>{/^(biomarker|variant|gene|protein):/.test(r.id)?<Link to={`/biomarkers/${r.id.split(':')[1]}`} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}<small>{r.kind}</small></li>)}</ul>

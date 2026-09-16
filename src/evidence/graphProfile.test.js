@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,shouldRetry,RETRY_DELAYS,fetchWithRetry} from './graphProfile.js';
+import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,shouldRetry,RETRY_DELAYS,fetchWithRetry,externalLinks,idCaption} from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -100,7 +100,7 @@ test('each index route resolves only its own kinds', () => {
 // Fixtures mirror what the graph actually holds for these two pages.
 const IL18 = {
   entity: { id: 'biomarker:il-18', name: 'IL-18', kind: 'Biomarker', aliases: ['IL-18', 'Interleukin-18'],
-    identity: { entity_class: 'Cytokine (IL-1 family protein)', specimen: 'Serum or plasma', measured_by_methods: 'Immunoassay (ELISA)',
+    identity: { entity_class: 'Cytokine (IL-1 family protein)', specimen: 'Serum or plasma', assay_hint: 'Immunoassay (ELISA)',
       pathway_note: 'Interleukin-18 is an IL-1 family cytokine released after inflammasome activation; it drives interferon-γ production.' } },
   rows: [
     { finding: { id: 'a1', kind: 'association', measure: 'odds_ratio', estimate: 25.6, target: 'clinical disease activity', population: 'biologic-naive patients with SD', assay: 'Plasma IL-18 levels' }, layer: 'observational', quote: 'odds ratio 25.6', pmid: '41399151' },
@@ -231,4 +231,17 @@ test('the retry loop recovers from a restarting engine and gives up on an answer
   const seen = [];
   await fetchWithRetry(() => (seen.length < 1 ? Promise.reject(failing(503)) : Promise.resolve('done')), { sleep, onRetry: n => seen.push(n) });
   assert.deepEqual(seen, [1]);
+});
+
+test('identifiers link to the registry that issued them, and the caption says what they identify', () => {
+  const links = externalLinks({ external_ids: { hgnc: 'HGNC:5986', ensembl: 'ENSG00000150782', uniprot: 'Q14116' } });
+  assert.deepEqual(links.map(l => [l.label, l.about]), [['HGNC', 'gene'], ['Ensembl', 'gene'], ['UniProt', 'protein']]);
+  assert.equal(links[0].url, 'https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC%3A5986');
+  assert.equal(links[2].url, 'https://www.uniprot.org/uniprotkb/Q14116');
+  assert.deepEqual(externalLinks({}), []);
+  assert.equal(externalLinks({ external_ids: { mondo: 'MONDO:0007254' } })[0].url, 'https://www.ebi.ac.uk/ols4/ontologies/mondo/classes?short_form=MONDO_0007254');
+  // A variant's identifiers belong to the gene it alters; the page must not imply otherwise.
+  assert.match(idCaption({ kind: 'Variant' }), /gene and protein this variant alters/);
+  assert.match(idCaption({ kind: 'Gene' }), /protein and any variant of it are separate/);
+  assert.match(idCaption({ kind: 'Biomarker' }), /gene that encodes it and the protein that is measured/);
 });
