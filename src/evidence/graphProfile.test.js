@@ -8,6 +8,12 @@ const spec={...sens,id:'obs:2',measure:'specificity',estimate:85};
 const auc={id:'obs:3',kind:'discrimination',measure:'auc',estimate:0.82,lower:0.76,upper:0.88,level:95,target:'neuroendocrine neoplasms'};
 const hr={id:'obs:4',kind:'prognosis',measure:'hazard_ratio',estimate:0.62,lower:0.48,upper:0.8,level:95,target:'progression-free survival'};
 
+test('small values keep their digits instead of rounding to zero',()=>{
+  assert.equal(valueText({measure:'delta_c_index',estimate:0.0004}),'Δ C-index 0.0004');
+  assert.equal(valueText({measure:'auc',estimate:0.82}),'AUC 0.82');
+  assert.equal(valueText({measure:'median',estimate:61425,unit:'pg/mL'}),'Median 61,425 pg/mL');
+});
+
 test('values are formatted as extracted, with interval and cut-off',()=>{
   assert.equal(valueText(sens),'Sensitivity 71% at a cut-off of 100 ng/mL');
   assert.equal(valueText(hr),'HR 0.62 (95% CI 0.48 to 0.8)');
@@ -112,6 +118,8 @@ test('Q1 names the class from curated identity, not the generic kind sentence', 
   const q1 = identity(IL18.entity, [{ edge: 'ENCODED_BY', id: 'gene:il18', name: 'IL18 gene', kind: 'Gene', outgoing: true }]);
   assert.equal(q1.label, 'Cytokine (IL-1 family protein)');
   assert.equal(q1.text, 'IL-18 is a cytokine (IL-1 family protein).');
+  // A curated sentence wins over the assembled one, so a pair reads like a clinician's sentence.
+  assert.equal(identity({ name: 'RET × selpercatinib', identity: { entity_class: 'Marker-and-treatment pair', identity_sentence: 'Treating RET-driven cancers with selpercatinib.' } }).text, 'Treating RET-driven cancers with selpercatinib.');
   assert.equal(q1.specimen, 'Serum or plasma');
   assert.deepEqual(q1.molecular.map(m => m.id), ['gene:il18']);
   assert.doesNotMatch(q1.text, /a quantity measured in a sample/i);
@@ -155,7 +163,10 @@ test('Q5 never infers utility, and the ladder marks each rung', () => {
   const q5 = utility(IL18.entity, IL18.rows);
   assert.equal(q5.state, 'empty');
   assert.match(q5.text, /No indexed evidence that measuring IL-18 changes decisions or outcomes/);
-  const rungs = Object.fromEntries(ladder(IL18.entity, IL18.rows).map(r => [r.key, r.indexed]));
+  const shown = ladder(IL18.entity, IL18.rows);
+  assert.deepEqual([shown[0].status, shown[1].status], ['In this library', 'Not in this library yet']);
+  assert.deepEqual([shown[1].target, shown[5].target], ['gp-q2', 'gp-q5']);
+  const rungs = Object.fromEntries(shown.map(r => [r.key, r.indexed]));
   assert.deepEqual(rungs, { discovery: true, biology: false, analytical: true, clinical: true, incremental: false, utility: false });
   assert.deepEqual(ladder({}, []).map(r => r.indexed), [false, false, false, false, false, false]);
   // A guideline statement belongs in Q5, but it does not light the utility rung.

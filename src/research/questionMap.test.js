@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { DEMO, BUSY_MESSAGE, mapFailure, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, sameOutcome, briefing, predictionRows, predictionReading } from './questionMap.js';
+import { DEMO, BUSY_MESSAGE, mapFailure, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, sameOutcome, briefing, predictionRows, predictionReading, entityBriefs, estimateRows } from './questionMap.js';
 import { forestCaption } from './figureModel.js';
 import { readResultTable, parseEstimateCell, parseInterval } from './resultTable.js';
 
@@ -174,4 +174,39 @@ test('a treatment forest says in its caption that it is not marker-guided care',
   assert.match(forestCaption(panel), /not evidence that ApoB-guided care improves outcomes/);
   const association = landscapePanels(estimates, 'Cardiovascular events', [], { marker: 'ApoB' }).find(p => p.mode === 'Association');
   assert.doesNotMatch(forestCaption(association), /ApoB-guided/);
+});
+
+test('each mentioned entity gets the profile contract: Q4 by kind, Q5, and a library ladder', () => {
+  const matrix = coverageMatrix(briefFixture, DEMO.question);
+  const estimates = publishedEstimates(briefFixture, {});
+  const [apob] = entityBriefs({ result: briefFixture, matrix, estimates });
+  assert.equal(apob.name, 'ApoB');
+  assert.equal(apob.source, 'retrieved');
+  const kinds = apob.q4.map(l => l.kind);
+  assert.ok(kinds.includes('discrimination') && kinds.includes('association'));
+  assert.match(apob.q4.find(l => l.kind === 'discrimination').text, /moved the C-index by at most 0\.0004/);
+  assert.match(apob.q5, /No indexed evidence that measuring ApoB changes decisions or outcomes/);
+  assert.ok(apob.inLibrary.includes('Clinical validation') && apob.inLibrary.includes('Incremental value'));
+  assert.ok(apob.missing.includes('Clinical utility'));
+});
+
+test('typed graph findings win over retrieved estimates, and scope is stated only when the indication differs', () => {
+  const matrix = coverageMatrix(briefFixture, DEMO.question);
+  const graph = { ...briefFixture, graph_findings: [
+    { id: 'g1', entity_id: 'entity:apob', kind: 'association', measure: 'hazard_ratio', estimate: 1.2, target: 'cardiovascular events', population: 'adults without cardiovascular disease', layer: 'observational', quote: 'HR 1.2', pmid: '1' },
+  ] };
+  const [brief] = entityBriefs({ result: graph, matrix, estimates: publishedEstimates(briefFixture, {}) });
+  assert.deepEqual([brief.source, brief.findings], ['graph', 1]);
+  assert.equal(brief.scope, null, 'the finding is about the outcome that was asked');
+  const offTopic = { ...graph, graph_findings: [{ ...graph.graph_findings[0], id: 'g2', target: 'chronic-persistent course', population: 'biologic-naive patients with Still disease' }] };
+  const [scoped] = entityBriefs({ result: offTopic, matrix, estimates: [] });
+  assert.match(scoped.scope, /Indexed evidence is currently from biologic-naive patients with Still disease/);
+});
+
+test('estimate rows carry the contract vocabulary, not the figure vocabulary', () => {
+  const rows = estimateRows(publishedEstimates(briefFixture, {}), 'entity:apob');
+  const measures = rows.map(r => [r.finding.kind, r.finding.measure]);
+  assert.ok(measures.some(([kind, measure]) => kind === 'discrimination' && measure === 'delta_c_index'));
+  assert.ok(measures.some(([kind, measure]) => kind === 'association' && measure === 'hazard_ratio'));
+  assert.deepEqual(estimateRows([], 'entity:apob'), []);
 });

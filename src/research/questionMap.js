@@ -4,7 +4,7 @@
 import { LAYERS, coverageBand, inferMode, plainPopulation, list } from '../profile/meaningModel.js';
 import { measureFamily, describeEffect, intervalSide, summarizeSides, validInterval, num } from '../evidence/measures.js';
 import { validRecord } from '../profile/visualModel.js';
-import { classificationRows, aucStrip } from '../evidence/graphProfile.js';
+import { classificationRows, aucStrip, meaning, utility, ladder, scopeNote, flatten } from '../evidence/graphProfile.js';
 
 export const MAP_VERSION = 'question-map-v1';
 export const DEMO = {
@@ -388,4 +388,47 @@ export function predictionReading(rows) {
     ],
     limits: 'Limits: each analysis uses its own base model, cohort and outcome definition; values are shown exactly as reported and are never pooled. The “added to” column states what each study actually put into the model.',
   };
+}
+
+// ---- Per-entity briefs: the profile contract, compacted ---------------------
+// The briefing answers Q4 and Q5 for each entity the question mentions, in the profile's own
+// language. Typed graph findings are preferred; retrieved estimates stand in when the graph has none.
+const ESTIMATE_KIND = { Association: 'association', Prediction: 'discrimination', 'Treatment outcomes': 'effect', 'Diagnostic performance': 'classification' };
+const ESTIMATE_MEASURE = { hr: 'hazard_ratio', or: 'odds_ratio', rr: 'risk_ratio', irr: 'rate_ratio', md: 'mean_difference', smd: 'standardized_mean_difference', rd: 'risk_difference', beta: 'other', correlation: 'correlation', c_index: 'c_index', c_index_change: 'delta_c_index', sensitivity: 'sensitivity', specificity: 'specificity', partial_eta2: 'other' };
+
+export function estimateRows(estimates, entityId) {
+  return estimates.filter(e => (e.entityIds || []).includes(entityId)).map(e => ({
+    finding: { id: e.id, kind: ESTIMATE_KIND[e.mode] || 'association', measure: ESTIMATE_MEASURE[e.fam?.key] || 'other', estimate: e.point, lower: e.lower, upper: e.upper, level: e.level,
+      unit: e.unit, target: e.outcome, population: e.population, assay: null, cutoff: null },
+    quote: e.quote, pmid: e.pmid, title: e.title, year: e.year, layer: e.layer, study_id: e.id,
+  }));
+}
+
+const overlapsQuestion = (rows, outcomes = []) => {
+  const asked = new Set(outcomes.flatMap(o => [...words(o)]));
+  if (!asked.size) return true;
+  return flatten(rows).some(f => [...words(`${f.target || ''} ${f.population || ''}`)].some(w => asked.has(w)));
+};
+
+export function entityBriefs({ result, matrix, estimates = [] }) {
+  const graphRows = (result?.graph_findings || []).map(f => ({ finding: f, quote: f.quote, pmid: f.pmid, title: f.title, layer: f.layer, study_id: f.study_id, entity_id: f.entity_id }));
+  const asked = (result?.copilot?.question?.outcomes) || [];
+  const named = (matrix?.rows || []).filter(r => r.primary && !r.temporary);
+  return named.map(row => {
+    const entity = (result?.entities || []).find(e => e.id === row.id) || { id: row.id, name: row.name };
+    const typed = graphRows.filter(f => f.entity_id === row.id);
+    const rows = typed.length ? typed : estimateRows(estimates, row.id);
+    const source = typed.length ? 'graph' : rows.length ? 'retrieved' : 'none';
+    const kinds = meaning(entity, rows);
+    const rungs = ladder(entity, rows);
+    return {
+      id: row.id, name: row.name, path: row.path, source, findings: flatten(rows).length,
+      q4: kinds.length ? kinds.map(k => ({ kind: k.kind, label: k.label, text: k.sentences[0] }))
+        : [{ kind: 'none', label: 'Nothing indexed', text: `No finding for ${row.name} is in this library, so nothing here says what its value indicates.` }],
+      q5: utility(entity, rows).text,
+      scope: rows.length && !overlapsQuestion(rows, asked) ? scopeNote(entity, rows) : null,
+      inLibrary: rungs.filter(r => r.indexed).map(r => r.label),
+      missing: rungs.filter(r => !r.indexed).map(r => r.label),
+    };
+  });
 }

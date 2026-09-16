@@ -10,7 +10,7 @@ import { loadVisualSnapshot } from '../profile/useVisualReport.js';
 import { axisFor } from '../profile/visualModel.js';
 import { LAYERS, BANDS, list } from '../profile/meaningModel.js';
 import { describeEffect, measureFamily, num } from '../evidence/measures.js';
-import { DEMO, MAP_VERSION, mapFailure, readJson, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount, cellFindings, cellAccuracy, briefing, predictionRows, predictionReading, leadMarker } from './questionMap.js';
+import { DEMO, MAP_VERSION, mapFailure, readJson, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount, cellFindings, cellAccuracy, briefing, predictionRows, predictionReading, leadMarker, entityBriefs } from './questionMap.js';
 import { AccuracyFigures } from '../evidence/GraphProfile.jsx';
 import { readResultTable, RESULT_ROLES } from './resultTable.js';
 import './questionMap.css';
@@ -189,6 +189,7 @@ export default function QuestionMap() {
   const next = matrix ? nextStep({ matrix, intents, estimates, question: questionFields, comparisons, outcome: current, utilityRecords: utilityRecordCount(result) }) : null;
   const predictionSet = predictionRows(estimates), prediction = { rows: predictionSet, reading: predictionReading(predictionSet) };
   const brief = matrix ? briefing({ result, matrix, intents, estimates, userRows, comparisons, questionFields, outcome: current }) : null;
+  const briefs = matrix ? entityBriefs({ result, matrix, estimates }) : [];
 
   useEffect(() => () => controller.current?.abort(), []);
   // A new map takes the first screen: panel A at the top, heatmap and landscape directly beneath.
@@ -304,6 +305,15 @@ export default function QuestionMap() {
       {brief && <section className="qm-panel qm-briefing" aria-labelledby="qm-brief">
         <Head id="qm-brief" letter="0" title="What the retrieved evidence says about this question" headingRef={mapHeading}><span className="qm-tag">Automated</span></Head>
         <ol className="qm-brief">{brief.sentences.map(s => <li key={s.kind} data-kind={s.kind}>{s.text}</li>)}</ol>
+        {briefs.length > 0 && <div className="qm-briefs">{briefs.map(b => <article key={b.id} className="qm-entity-brief">
+          <h3>{b.path ? <a href={b.path}>{b.name}</a> : b.name}<span>{b.source === 'graph' ? `${b.findings} typed ${b.findings === 1 ? 'finding' : 'findings'} in this library` : b.source === 'retrieved' ? `${b.findings} retrieved ${b.findings === 1 ? 'estimate' : 'estimates'}` : 'nothing in this library'}</span></h3>
+          {b.scope && <p className="qm-brief-scope">{b.scope}</p>}
+          <dl>
+            {b.q4.map(line => <div key={line.kind}><dt>{line.label}</dt><dd>{line.text}</dd></div>)}
+            <div><dt>Clinical utility</dt><dd>{b.q5}</dd></div>
+          </dl>
+          <p className="qm-brief-ladder"><span>In this library: {b.inLibrary.length ? b.inLibrary.join(', ') : 'nothing yet'}</span><span>Not yet: {b.missing.length ? b.missing.join(', ') : 'nothing missing'}</span></p>
+        </article>)}</div>}
         <p className="qm-note">{brief.basis}</p>
       </section>}
       <section className="qm-panel qm-intent" aria-labelledby="qm-a">

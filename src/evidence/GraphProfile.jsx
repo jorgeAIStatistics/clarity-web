@@ -104,14 +104,17 @@ export default function GraphProfile({slug,go,type='biomarker'}){
     <section className="gp-section" aria-labelledby="gp-ladder-title">
       <div className="gp-section-head"><h2 id="gp-ladder-title">How far the evidence goes</h2><p className="ev-note">A rung is indexed only when a finding in this graph speaks to it. Not indexed means Clarity holds nothing, not that nothing exists.</p></div>
       <ol className="gp-ladder">{rungs.map(r=><li key={r.key} data-indexed={r.indexed}>
-        <span>{r.label}</span><strong>{r.indexed?'Indexed':'Not indexed'}</strong><small>{r.asks}</small>
+        <a href={`#${r.target}`} onClick={event=>{event.preventDefault();document.getElementById(r.target)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});document.getElementById(r.target)?.focus?.({preventScroll:true});}}>
+          <span>{r.label}</span><strong>{r.status}</strong>{r.indexed&&<small>{r.asks}</small>}
+        </a>
       </li>)}</ol>
     </section>
 
     <section className="gp-q" aria-labelledby="gp-q1">
-      <h2 id="gp-q1"><em>Q1</em>{ask[0]}</h2>
+      <h2 id="gp-q1" tabIndex={-1}><em>Q1</em>{ask[0]}</h2>
       <p className="gp-lead">{q1.text}</p>
       {!q1.curated&&<p className="ev-note">No curated class is stored for this entity yet, so this is the generic description for its kind.</p>}
+      {scope&&<p className="gp-scope">{scope}</p>}
       <dl className="gp-facts">
         <div><dt>Class</dt><dd>{q1.label}</dd></div>
         {q1.specimen&&<div><dt>Specimen</dt><dd>{q1.specimen}</dd></div>}
@@ -124,7 +127,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
     </section>
 
     <section className="gp-q" aria-labelledby="gp-q2">
-      <h2 id="gp-q2"><em>Q2</em>{ask[1]}</h2>
+      <h2 id="gp-q2" tabIndex={-1}><em>Q2</em>{ask[1]}</h2>
       {q2.state==='background'&&<p className="gp-badge">Background, not a finding</p>}
       <p className="gp-lead">{q2.text}</p>
       {q2.findings.length>0&&<FindingList rows={q2.findings}/>}
@@ -132,7 +135,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
     </section>
 
     <section className="gp-q" aria-labelledby="gp-q3">
-      <h2 id="gp-q3"><em>Q3</em>{ask[2]}</h2>
+      <h2 id="gp-q3" tabIndex={-1}><em>Q3</em>{ask[2]}</h2>
       <p className="gp-lead" data-gap={q3.gap||undefined}>{q3.text}</p>
       <dl className="gp-facts">
         {q3.assays.length>0&&<div><dt>Assays named</dt><dd>{q3.assays.join(' · ')}</dd></div>}
@@ -142,8 +145,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
     </section>
 
     <section className="gp-q" aria-labelledby="gp-q4">
-      <h2 id="gp-q4"><em>Q4</em>{ask[3]}</h2>
-      {scope&&<p className="gp-scope">{scope}</p>}
+      <h2 id="gp-q4" tabIndex={-1}><em>Q4</em>{ask[3]}</h2>
       {q4.length===0&&<p className="gp-lead">No typed finding is indexed for {entity.name}, so this page supports no claim about what its value indicates.</p>}
       {q4.map(g=><div className="gp-kind" key={g.kind}>
         <h3>{g.label}<span>{g.rows.length}</span></h3>
@@ -156,7 +158,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
     </section>
 
     <section className="gp-q" aria-labelledby="gp-q5">
-      <h2 id="gp-q5"><em>Q5</em>{ask[4]}</h2>
+      <h2 id="gp-q5" tabIndex={-1}><em>Q5</em>{ask[4]}</h2>
       <p className="gp-lead" data-gap={q5.state==='empty'||undefined}>{q5.text}</p>
       {q5.rows.length>0&&<FindingList rows={q5.rows}/>}
     </section>
@@ -183,18 +185,33 @@ export function useGraphBiomarkers(enabled=true){
   },[enabled]);
   return state;
 }
+function Card({entity,go}){
+  const n=entity.coverage.quantified_outcomes;
+  return <a className="ev-entity-card" href={entity.path} onClick={ev=>{if(!ev.metaKey&&!ev.ctrlKey&&!ev.shiftKey&&!ev.altKey&&ev.button===0){ev.preventDefault();go(entity.path);}}}>
+    <div className="ev-entity-card-top"><span>{entity.category} · evidence graph</span></div>
+    <h3>{entity.name}</h3>
+    <p>{(entity.aliases||[]).filter(a=>a!==entity.name).slice(0,3).join(' · ')||'No other names indexed'}</p>
+    <div className="ev-entity-card-bottom"><span>{n>0?`${n} typed ${n===1?'finding':'findings'}`:'Not in this library yet'}</span><span>{entity.coverage.linked_studies} publications</span></div>
+  </a>;
+}
+
 export function GraphBiomarkerList({go,query='',rows=undefined,failed=false,label='From the evidence graph'}){
   const fetched=useGraphBiomarkers(rows===undefined);
   const all=rows===undefined?fetched.rows:rows, missing=rows===undefined?fetched.failed:failed;
   const shown=graphMatches(all,query);
+  // Pages that can answer something lead; names with nothing indexed stay searchable behind a fold.
+  const withFindings=shown.filter(e=>e.coverage.quantified_outcomes>0),gaps=shown.filter(e=>!e.coverage.quantified_outcomes);
   return <section className="ev-browser" aria-labelledby="gp-graph-list">
-    <div className="ev-library-title"><h2 id="gp-graph-list">{label}{all?` (${all.length})`:''}</h2><span role="status">{missing?'The evidence graph list could not be loaded.':all?`${shown.length} shown`:'Loading…'}</span></div>
+    <div className="ev-library-title"><h2 id="gp-graph-list">{label}{all?` (${all.length})`:''}</h2><span role="status">{missing?'The evidence graph list could not be loaded.':all?`${withFindings.length} with typed findings · ${gaps.length} not yet`:'Loading…'}</span></div>
     <p className="ev-note">Automated graph profiles: aliases, five evidence layers and typed findings with source passages. GAP means no typed finding is indexed yet, not that none exist.</p>
-    {all&&<div className="ev-grid">{shown.map(e=>{const n=e.coverage.quantified_outcomes;return <a key={e.id} className="ev-entity-card" href={e.path} onClick={ev=>{if(!ev.metaKey&&!ev.ctrlKey&&!ev.shiftKey&&!ev.altKey&&ev.button===0){ev.preventDefault();go(e.path);}}}>
-      <div className="ev-entity-card-top"><span>{e.category} · evidence graph</span></div>
-      <h3>{e.name}</h3>
-      <p>{(e.aliases||[]).filter(a=>a!==e.name).slice(0,3).join(' · ')||'No other names indexed'}</p>
-      <div className="ev-entity-card-bottom"><span>{n>0?`${n} typed ${n===1?'finding':'findings'}`:'GAP · no typed findings yet'}</span><span>{e.coverage.linked_studies} publications</span></div>
-    </a>;})}</div>}
+    {all&&<>
+      {withFindings.length>0&&<div className="ev-grid">{withFindings.map(e=><Card key={e.id} entity={e} go={go}/>)}</div>}
+      {gaps.length>0&&<details className="gp-gap-list" open={Boolean(query.trim())}>
+        <summary>{gaps.length} {gaps.length===1?'name':'names'} in the library with no typed finding yet</summary>
+        <p className="ev-note">These pages carry aliases and an honest gap statement. Searching still finds them.</p>
+        <div className="ev-grid">{gaps.map(e=><Card key={e.id} entity={e} go={go}/>)}</div>
+      </details>}
+      {!shown.length&&<p className="ev-note">No graph entity matches this search.</p>}
+    </>}
   </section>;
 }

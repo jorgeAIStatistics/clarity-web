@@ -18,7 +18,10 @@ const KIND_NOTES={
 };
 const MEASURES={hazard_ratio:'HR',odds_ratio:'OR',risk_ratio:'RR',rate_ratio:'Rate ratio',mean_difference:'Mean difference',standardized_mean_difference:'SMD',risk_difference:'Risk difference',correlation:'Correlation',auc:'AUC',c_index:'C-index',delta_c_index:'Δ C-index',sensitivity:'Sensitivity',specificity:'Specificity',ppv:'PPV',npv:'NPV',accuracy:'Accuracy',likelihood_ratio_positive:'LR+',likelihood_ratio_negative:'LR−',cutoff:'Cut-off',median:'Median',mean:'Mean',proportion:'Proportion',percent:'Percent',p_value:'P value',recommendation:'Recommendation',other:'Reported measure'};
 const OPERATORS={lt:'<',le:'≤',gt:'>',ge:'≥',eq:'='};
-const num=n=>Number(n).toLocaleString('en-US',{maximumFractionDigits:3});
+// A C-index change of 0.0004 must not round to 0; small values keep significant digits.
+const num=n=>{const v=Number(n);return Math.abs(v)>0&&Math.abs(v)<0.01
+  ?v.toLocaleString('en-US',{maximumSignificantDigits:2})
+  :v.toLocaleString('en-US',{maximumFractionDigits:3});};
 const unitText=unit=>unit==='%'?'%':unit?` ${unit}`:'';
 
 export function valueText(f){
@@ -191,7 +194,7 @@ export function identity(entity={},related=[]){
     label:id.entity_class||objectKind(entity).label,
     curated:Boolean(id.entity_class),
     // Lower-case only the leading ordinary word: IL-1, MUC16 and NGS keep their case.
-    text:id.entity_class?`${entity.name} is ${/^[aeiou]/i.test(id.entity_class)?'an':'a'} ${id.entity_class.replace(/^[A-Z][a-z]+/,w=>w.toLowerCase())}.`:objectKind(entity).text,
+    text:id.identity_sentence?id.identity_sentence:id.entity_class?`${entity.name} is ${/^[aeiou]/i.test(id.entity_class)?'an':'a'} ${id.entity_class.replace(/^[A-Z][a-z]+/,w=>w.toLowerCase())}.`:objectKind(entity).text,
     specimen:id.specimen||null,
     aliases:(entity.aliases||[]).filter(a=>a!==entity.name),
     molecular,
@@ -239,10 +242,17 @@ const KIND_MEANING={
       'Group values can overlap almost completely even when their averages differ, so a difference that is biologically interesting can still be useless for telling two people apart.'];
   },
   discrimination:(name,group)=>{
-    const values=group.filter(f=>f.estimate!=null).map(f=>f.estimate);
-    return [`Reported discrimination for ${listWords(group.map(f=>f.target))}: ${MEASURES[group[0].measure]||'AUC'} ${values.length?range(values):'not stated'} on a scale where 0.5 is chance.`,
-      'Discrimination describes how well the marker ranks people inside that study\u2019s own sample. It is not calibration, and it does not show that any decision changed.',
-      'Even a high value leaves overlapping distributions: some people above the cut-off do not have the condition, and some below it do.'];
+    // A standalone AUC and a change in C-index answer different questions and must not share a sentence.
+    const areas=group.filter(f=>['auc','c_index'].includes(f.measure)&&f.estimate!=null);
+    const deltas=group.filter(f=>f.measure==='delta_c_index'&&f.estimate!=null);
+    const lines=[];
+    if(areas.length)lines.push(`Reported discrimination for ${listWords(areas.map(f=>f.target))}: ${MEASURES[areas[0].measure]} ${range(areas.map(f=>f.estimate))} on a scale where 0.5 is chance.`);
+    if(deltas.length)lines.push(`Added to a model that already exists, ${name} moved the C-index by at most ${num(Math.max(...deltas.map(f=>Math.abs(f.estimate))))} on that same 0.5\u20131 scale.`);
+    if(!lines.length)lines.push(`Discrimination is reported for ${listWords(group.map(f=>f.target))} without a usable value.`);
+    lines.push(deltas.length?'A model can rank people slightly better and still change no decision: incremental discrimination is not utility.'
+      :'Discrimination describes how well the marker ranks people inside that study\u2019s own sample. It is not calibration, and it does not show that any decision changed.');
+    lines.push('Even a high value leaves overlapping distributions: some people above the cut-off do not have the condition, and some below it do.');
+    return lines;
   },
   classification:(name,group)=>{
     const cut=uniq(group.map(f=>f.cutoff!=null?`${num(f.cutoff)}${f.cutoff_unit?` ${f.cutoff_unit}`:''}`:null));
@@ -281,7 +291,10 @@ export function utility(entity={},rows=[]){
 // The ladder: which rungs the graph can speak to at all.
 export const RUNGS=['discovery','biology','analytical','clinical','incremental','utility'];
 const RUNG_LABELS={discovery:'Discovery',biology:'Biology',analytical:'Analytical validation',clinical:'Clinical validation',incremental:'Incremental value',utility:'Clinical utility'};
-const RUNG_ASKS={discovery:'Is it reported at all?',biology:'Is there a mechanism or laboratory finding?',analytical:'Do the findings name an assay?',clinical:'Association, discrimination, classification or prognosis?',incremental:'Does it add to the tools already in use?',utility:'Does using it change decisions or outcomes? Guidance alone does not count.'};
+const RUNG_ASKS={discovery:'Reported findings exist here.',biology:'A mechanism or laboratory finding is here.',analytical:'The findings name the assay used.',clinical:'Association, discrimination, classification or prognosis is here.',incremental:'Something compares it with the tools already in use.',utility:'Something tests whether using it changes decisions or outcomes.'};
+// Each rung points at the question that already explains it, filled or empty.
+const RUNG_TARGET={discovery:'gp-q4',biology:'gp-q2',analytical:'gp-q3',clinical:'gp-q4',incremental:'gp-q4',utility:'gp-q5'};
+export const IN_LIBRARY='In this library',NOT_IN_LIBRARY='Not in this library yet';
 const INCREMENTAL=/\badded to\b|\bincremental\b|\bbeyond\b|\bin addition to\b|\bcombined with\b|\bversus\b/i;
 export function ladder(entity={},rows=[]){
   const list=flatten(rows);
@@ -295,7 +308,8 @@ export function ladder(entity={},rows=[]){
     // A guideline statement is not evidence that measuring changes outcomes; only a utility finding is.
     utility:has(['utility']),
   };
-  return RUNGS.map(key=>({key,label:RUNG_LABELS[key],asks:RUNG_ASKS[key],indexed:state[key]}));
+  return RUNGS.map(key=>({key,label:RUNG_LABELS[key],asks:RUNG_ASKS[key],indexed:state[key],
+    status:state[key]?IN_LIBRARY:NOT_IN_LIBRARY,target:RUNG_TARGET[key]}));
 }
 
 // What the indexed evidence is actually about, so a reader does not take it for the general case.
