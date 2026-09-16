@@ -12,6 +12,9 @@ test('small values keep their digits instead of rounding to zero',()=>{
   assert.equal(valueText({measure:'delta_c_index',estimate:0.0004}),'Δ C-index 0.0004');
   assert.equal(valueText({measure:'auc',estimate:0.82}),'AUC 0.82');
   assert.equal(valueText({measure:'median',estimate:61425,unit:'pg/mL'}),'Median 61,425 pg/mL');
+  // A descriptive clause in the unit field is not a unit and is dropped, not printed beside the number.
+  assert.equal(valueText({measure:'hazard_ratio',estimate:0.85,unit:'median 2.8-year follow-up; lipid markers were eligibility criteria'}),'HR 0.85');
+  assert.equal(valueText({measure:'hazard_ratio',estimate:0.85,unit:'per 1 SD'}),'HR 0.85 per 1 SD');
 });
 
 test('values are formatted as extracted, with interval and cut-off',()=>{

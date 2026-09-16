@@ -22,7 +22,14 @@ const OPERATORS={lt:'<',le:'≤',gt:'>',ge:'≥',eq:'='};
 const num=n=>{const v=Number(n);return Math.abs(v)>0&&Math.abs(v)<0.01
   ?v.toLocaleString('en-US',{maximumSignificantDigits:2})
   :v.toLocaleString('en-US',{maximumFractionDigits:3});};
-const unitText=unit=>unit==='%'?'%':unit?` ${unit}`:'';
+// Extractions sometimes put a whole clause in the unit field ("median 2.8-year follow-up; ...").
+// A unit is short and symbol-like; anything else is a description and does not belong beside a number.
+const unitText=unit=>{
+  const text=String(unit||'').trim();
+  if(!text)return '';
+  if(text==='%'||text==='‰')return text;
+  return text.length<=12&&!/[;,]/.test(text)?` ${text}`:'';
+};
 
 export function valueText(f){
   if(f.measure==='recommendation')return 'Recommendation';
