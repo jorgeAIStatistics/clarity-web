@@ -252,8 +252,13 @@ const KIND_MEANING={
     // A standalone AUC and a change in C-index answer different questions and must not share a sentence.
     const areas=group.filter(f=>['auc','c_index'].includes(f.measure)&&f.estimate!=null);
     const deltas=group.filter(f=>f.measure==='delta_c_index'&&f.estimate!=null);
+    // An AUC reported as 81.65 is on a 0-100 scale; saying 0.5 is chance would misread it by a factor of 100.
+    const percent=f=>f.unit==='%'||f.estimate>1;
     const lines=[];
-    if(areas.length)lines.push(`Reported discrimination for ${listWords(areas.map(f=>f.target))}: ${MEASURES[areas[0].measure]} ${range(areas.map(f=>f.estimate))} on a scale where 0.5 is chance.`);
+    for(const [scaled,rows] of [[false,areas.filter(f=>!percent(f))],[true,areas.filter(percent)]]){
+      if(!rows.length)continue;
+      lines.push(`Reported discrimination for ${listWords(rows.map(f=>f.target))}: ${MEASURES[rows[0].measure]} ${range(rows.map(f=>f.estimate))}${scaled?'%':''} on a scale where ${scaled?'50% is':'0.5 is'} chance.`);
+    }
     if(deltas.length)lines.push(`Added to a model that already exists, ${name} moved the C-index by at most ${num(Math.max(...deltas.map(f=>Math.abs(f.estimate))))} on that same 0.5\u20131 scale.`);
     if(!lines.length)lines.push(`Discrimination is reported for ${listWords(group.map(f=>f.target))} without a usable value.`);
     lines.push(deltas.length?'A model can rank people slightly better and still change no decision: incremental discrimination is not utility.'
@@ -262,10 +267,18 @@ const KIND_MEANING={
     return lines;
   },
   classification:(name,group)=>{
-    const cut=uniq(group.map(f=>f.cutoff!=null?`${num(f.cutoff)}${f.cutoff_unit?` ${f.cutoff_unit}`:''}`:null));
-    return [`At the authors\u2019 own cut-off${cut.length?` (${listWords(cut)})`:''}, the indexed studies report ${listWords(group.map(f=>`${MEASURES[f.measure]||f.measure} ${num(f.estimate)}${f.unit==='%'?'%':''}`))} for ${listWords(group.map(f=>f.target))}.`,
-      'A cut-off is a property of the study that chose it: another assay, spectrum of disease or population moves it.',
-      'Sensitivity and specificity say nothing about how many positives are true in your setting; that depends on how common the condition is there.'];
+    const ACCURACY=['sensitivity','specificity','ppv','npv','accuracy','likelihood_ratio_positive','likelihood_ratio_negative'];
+    const accuracy=group.filter(f=>ACCURACY.includes(f.measure)&&f.estimate!=null);
+    // A bare threshold is not an accuracy result; do not dress it up as one.
+    const cut=uniq(group.map(f=>f.cutoff!=null?`${num(f.cutoff)}${f.cutoff_unit?` ${f.cutoff_unit}`:''}`
+      :f.measure==='cutoff'&&f.estimate!=null?`${num(f.estimate)}${unitText(f.unit)}`:null));
+    const targets=listWords(group.map(f=>f.target));
+    const lines=[accuracy.length
+      ? `At the authors\u2019 own cut-off${cut.length?` (${listWords(cut)})`:''}, the indexed studies report ${listWords(accuracy.map(f=>`${MEASURES[f.measure]||f.measure} ${num(f.estimate)}${f.unit==='%'?'%':''}`))} for ${targets}.`
+      : `A cut-off${cut.length?` of ${listWords(cut)}`:''} was used to classify ${targets}, with no sensitivity or specificity indexed at that threshold.`,
+      'A cut-off is a property of the study that chose it: another assay, spectrum of disease or population moves it.'];
+    if(accuracy.length)lines.push('Sensitivity and specificity say nothing about how many positives are true in your setting; that depends on how common the condition is there.');
+    return lines;
   },
   prognosis:(name,group)=>[
     `${name} was reported against later course — ${listWords(group.map(f=>f.target))} — as ${listWords(group.map(f=>valueText(f)))}.`,

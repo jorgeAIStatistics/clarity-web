@@ -162,6 +162,21 @@ test('Q4 computes one subhead per kind present, and IL-18 does not read like CA-
   assert.doesNotMatch(text, /CA-125/);
 });
 
+test('a percent-scale AUC and a bare cut-off are read on their own terms', () => {
+  const psa = { entity: { name: 'PSA', kind: 'Biomarker' }, rows: [
+    { finding: { id: 'p1', kind: 'discrimination', measure: 'auc', estimate: 81.65, target: 'bone metastasis' }, quote: 'AUC 81.65%', pmid: '40792342' },
+    { finding: { id: 'p2', kind: 'classification', measure: 'cutoff', estimate: 18.95, unit: 'ng/mL', target: 'bone metastasis' }, quote: 'cut-off 18.95 ng/mL', pmid: '40792342' },
+  ] };
+  const groups = meaning(psa.entity, psa.rows);
+  const discrimination = groups.find(g => g.kind === 'discrimination'), classification = groups.find(g => g.kind === 'classification');
+  assert.match(discrimination.sentences[0], /AUC 81.65% on a scale where 50% is chance/);
+  assert.match(classification.sentences[0], /A cut-off of 18.95 ng\/mL was used to classify bone metastasis, with no sensitivity or specificity indexed/);
+  assert.equal(classification.sentences.length, 2, 'no sensitivity caveat when none is indexed');
+  // A proportion-scale AUC keeps the 0.5 wording.
+  const proportion = meaning({ name: 'CgA' }, [{ finding: { id: 'a1', kind: 'discrimination', measure: 'auc', estimate: 0.82, target: 'x' }, quote: 'q' }]);
+  assert.match(proportion.find(g => g.kind === 'discrimination').sentences[0], /AUC 0.82 on a scale where 0.5 is chance/);
+});
+
 test('Q5 never infers utility, and the ladder marks each rung', () => {
   const q5 = utility(IL18.entity, IL18.rows);
   assert.equal(q5.state, 'empty');
