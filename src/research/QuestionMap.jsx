@@ -156,6 +156,30 @@ function CellDrawer({ cell, onClose, estimates }) {
   </dialog>;
 }
 
+// Panel E is a design to argue with. Saving it keeps it with the question that prompted it, for
+// as long as that question is stored (seven days), and never longer.
+function SaveNextStep({ step, questionId, entityIds }) {
+  const [state, setState] = useState({ phase: 'idle' });
+  if (!questionId) return <p className="qm-note">This step can be saved once the question has been mapped against the graph.</p>;
+  const save = async () => {
+    setState({ phase: 'saving' });
+    try {
+      const response = await fetch(`${API_BASE}/api/evidence/graph/next-step`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question_id: questionId, title: step.title, design: step.design, population: step.population,
+          outcome: step.outcome, comparator: step.stratum || '', why: step.why, rung: step.cells?.[0]?.layer || '', entity_ids: entityIds }),
+      });
+      const data = await readJson(response);
+      setState(response.ok && data?.stored ? { phase: 'saved', days: data.expires_in_days } : { phase: 'error', message: data?.error || 'It could not be saved.' });
+    } catch { setState({ phase: 'error', message: 'The evidence service could not be reached.' }); }
+  };
+  if (state.phase === 'saved') return <p className="qm-note" role="status">Saved with this question for {state.days} days. It is a suggested design, not advice about a person.</p>;
+  return <div className="qm-actions">
+    <button type="button" className="qm-button" onClick={save} disabled={state.phase === 'saving'}>{state.phase === 'saving' ? 'Saving…' : 'Save this next step'}</button>
+    {state.phase === 'error' && <span className="qm-note" role="alert">{state.message}</span>}
+  </div>;
+}
+
 function IntentEditor({ initial, onSubmit, onCancel }) {
   const [population, setPopulation] = useState(initial.population), [outcome, setOutcome] = useState(initial.outcome), [intents, setIntents] = useState(initial.intents);
   return <form className="qm-intent-editor" onSubmit={e => { e.preventDefault(); onSubmit({ population: population.trim(), outcome: outcome.trim(), intents }); }}>
@@ -383,6 +407,7 @@ export default function QuestionMap() {
             <dl>{[['Design', next.design], ['Population', next.population], ['Outcome', next.outcome], ['Stratum', next.stratum]].filter(([, v]) => v).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
             <p><strong>Why.</strong> {next.why}</p>
             <p className="qm-note">{next.note}</p>
+            <SaveNextStep step={next} questionId={result.question_id} entityIds={matrix.rows.filter(r => r.primary).map(r => r.id)} />
           </> : <p>Map a question with at least one named profile to get a suggested next step.</p>}
         </section>
       </div>
