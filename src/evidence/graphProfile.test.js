@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,usageNotes,findingsCsv,findingsJson,EXPORT_COLUMNS} from './graphProfile.js';
+import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,usageNotes,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS} from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -88,4 +88,14 @@ test('findings export as one row per finding with quotes escaped', () => {
   const parsed = JSON.parse(findingsJson(entity, [row(sens)], [{ layer: 'observational', n_findings: 1 }]));
   assert.equal(parsed.version, 'clarity-graph-findings-v1');
   assert.deepEqual([parsed.entity.id, parsed.findings.length, parsed.layers[0].layer], ['biomarker:chromogranin-a', 1, 'observational']);
+});
+
+test('each index route resolves only its own kinds', () => {
+  assert.deepEqual(graphPrefixes('biomarker'), ['biomarker', 'variant', 'gene', 'protein', 'metabolite']);
+  assert.deepEqual(graphPrefixes('diagnostic'), ['test', 'assay']);
+  assert.deepEqual(graphPrefixes('precision_oncology'), ['precision_context']);
+  assert.deepEqual(graphPrefixes('unknown'), graphPrefixes('biomarker'));
+  assert.deepEqual(routeTypes('tests'), ['diagnostic', 'screening']);
+  assert.deepEqual(routeTypes('precision-medicine'), ['precision_oncology']);
+  assert.deepEqual(routeTypes('explore'), []);
 });

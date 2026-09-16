@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,groupFindings,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,usageNotes,findingsCsv,findingsJson,LAYERS} from './graphProfile.js';
+import {layerLabel,groupFindings,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,usageNotes,findingsCsv,findingsJson,graphPrefixes,LAYERS} from './graphProfile.js';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -39,20 +39,22 @@ export function AccuracyFigures({table,strip}){
   </>;
 }
 
-function Hero({name,go,children}){
+const INDEX={biomarker:['/biomarkers','All biomarkers','BIOMARKERS'],diagnostic:['/diagnostics','All diagnostics','DIAGNOSTICS'],screening:['/screening','All screening','SCREENING'],precision_oncology:['/precision-medicine','All precision medicine','PRECISION MEDICINE']};
+function Hero({name,go,type='biomarker',children}){
   const heading=useRef(null);
+  const [path,back,eyebrow]=INDEX[type]||INDEX.biomarker;
   useEffect(()=>{heading.current?.focus({preventScroll:true});},[name]);
-  return <div className="ev-hero"><Link className="ev-back" to="/biomarkers" go={go}><ArrowLeft size={15}/>All biomarkers</Link><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><h1 ref={heading} tabIndex={-1}>{name}</h1>{children}</div>;
+  return <div className="ev-hero"><Link className="ev-back" to={path} go={go}><ArrowLeft size={15}/>{back}</Link><div className="ev-eyebrow">{eyebrow} / GRAPH PROFILE · AUTOMATED</div><h1 ref={heading} tabIndex={-1}>{name}</h1>{children}</div>;
 }
 
-export default function GraphProfile({slug,go}){
+export default function GraphProfile({slug,go,type='biomarker'}){
   const [state,setState]=useState({status:'loading'});const [attempt,setAttempt]=useState(0);
   useEffect(()=>{
     let active=true;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
     setState({status:'loading'});
     // Variants and genes share the biomarker address space; a biomarker id wins when both exist.
     const load=async()=>{
-      for(const prefix of ['biomarker','variant','gene']){
+      for(const prefix of graphPrefixes(type)){
         const r=await fetch(`${API_BASE}/api/evidence/graph/entity/${prefix}:${encodeURIComponent(slug)}`,{signal:controller.signal});
         if(r.status===404)continue;
         if(!r.ok)throw Error(String(r.status));
@@ -64,11 +66,11 @@ export default function GraphProfile({slug,go}){
       .catch(()=>{if(active)setState({status:'error'});})
       .finally(()=>clearTimeout(timer));
     return()=>{active=false;clearTimeout(timer);controller.abort();};
-  },[slug,attempt]);
+  },[slug,type,attempt]);
 
   if(state.status==='loading')return <div className="gp" aria-busy="true"><div className="ev-hero"><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><div className="gp-skeleton gp-skeleton-title"/><div className="gp-skeleton"/></div><ul className="gp-layers" aria-hidden="true">{LAYERS.map(l=><li key={l} className="gp-layer gp-layer-skeleton"/>)}</ul><p className="ev-note" role="status">Loading the graph profile…</p></div>;
-  if(state.status==='missing')return <div className="gp"><Hero name="Page not found" go={go}/><section className="ev-panel"><h2>This evidence page does not exist</h2><p>No biomarker in the Clarity graph uses this address.</p><Link to="/biomarkers" go={go}>Return to biomarkers</Link></section></div>;
-  if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><p>The evidence engine may be starting up. Try again in a minute.</p><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
+  if(state.status==='missing')return <div className="gp"><Hero name="Page not found" go={go} type={type}/><section className="ev-panel"><h2>This evidence page does not exist</h2><p>No biomarker in the Clarity graph uses this address.</p><Link to="/biomarkers" go={go}>Return to biomarkers</Link></section></div>;
+  if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><p>The evidence engine may be starting up. Try again in a minute.</p><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
 
   const {entity,layers,findings,related,studies,dead_letters:dead}=state.data;
   const groups=groupFindings(findings),total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
@@ -80,7 +82,7 @@ export default function GraphProfile({slug,go}){
   };
   const aliases=entity.aliases.filter(a=>a!==entity.name);
   return <div className="gp">
-    <Hero name={entity.name} go={go}>
+    <Hero name={entity.name} go={go} type={type}>
       <p className="ev-intro">What indexed publications report about {entity.name}, kept apart by evidence layer and by finding kind. Each reading comes from a quoted source passage and is automated, not expert-reviewed.</p>
       <dl className="gp-identity">
         {aliases.length>0&&<div><dt>Also written as</dt><dd>{aliases.join(' · ')}</dd></div>}
@@ -154,12 +156,12 @@ export function useGraphBiomarkers(enabled=true){
   },[enabled]);
   return state;
 }
-export function GraphBiomarkerList({go,query='',rows=undefined,failed=false}){
+export function GraphBiomarkerList({go,query='',rows=undefined,failed=false,label='From the evidence graph'}){
   const fetched=useGraphBiomarkers(rows===undefined);
   const all=rows===undefined?fetched.rows:rows, missing=rows===undefined?fetched.failed:failed;
   const shown=graphMatches(all,query);
   return <section className="ev-browser" aria-labelledby="gp-graph-list">
-    <div className="ev-library-title"><h2 id="gp-graph-list">From the evidence graph{all?` (${all.length})`:''}</h2><span role="status">{missing?'The evidence graph list could not be loaded.':all?`${shown.length} shown`:'Loading…'}</span></div>
+    <div className="ev-library-title"><h2 id="gp-graph-list">{label}{all?` (${all.length})`:''}</h2><span role="status">{missing?'The evidence graph list could not be loaded.':all?`${shown.length} shown`:'Loading…'}</span></div>
     <p className="ev-note">Automated graph profiles: aliases, five evidence layers and typed findings with source passages. GAP means no typed finding is indexed yet, not that none exist.</p>
     {all&&<div className="ev-grid">{shown.map(e=>{const n=e.coverage.quantified_outcomes;return <a key={e.id} className="ev-entity-card" href={e.path} onClick={ev=>{if(!ev.metaKey&&!ev.ctrlKey&&!ev.shiftKey&&!ev.altKey&&ev.button===0){ev.preventDefault();go(e.path);}}}>
       <div className="ev-entity-card-top"><span>{e.category} · evidence graph</span></div>

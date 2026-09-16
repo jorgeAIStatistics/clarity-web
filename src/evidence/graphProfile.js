@@ -172,3 +172,9 @@ export function findingsCsv(entity={},rows=[]){
 export function findingsJson(entity={},rows=[],layers=[]){
   return JSON.stringify({version:'clarity-graph-findings-v1',exported_at:new Date().toISOString(),entity,layers,findings:flatten(rows)},null,2);
 }
+
+// Which graph id prefixes an index route may resolve. A biomarker URL never resolves a test.
+export const ROUTE_PREFIXES={biomarker:['biomarker','variant','gene','protein','metabolite'],diagnostic:['test','assay'],screening:['test','assay'],precision_oncology:['precision_context']};
+export const ROUTE_TYPES={biomarkers:['biomarker'],diagnostics:['diagnostic'],screening:['screening'],tests:['diagnostic','screening'],'precision-medicine':['precision_oncology']};
+export const graphPrefixes=type=>ROUTE_PREFIXES[type]||ROUTE_PREFIXES.biomarker;
+export const routeTypes=root=>ROUTE_TYPES[root]||[];
