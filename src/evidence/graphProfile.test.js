@@ -111,7 +111,7 @@ const CA125 = {
 test('Q1 names the class from curated identity, not the generic kind sentence', () => {
   const q1 = identity(IL18.entity, [{ edge: 'ENCODED_BY', id: 'gene:il18', name: 'IL18 gene', kind: 'Gene', outgoing: true }]);
   assert.equal(q1.label, 'Cytokine (IL-1 family protein)');
-  assert.match(q1.text, /IL-18 is a cytokine \(il-1 family protein\)\./i);
+  assert.equal(q1.text, 'IL-18 is a cytokine (IL-1 family protein).');
   assert.equal(q1.specimen, 'Serum or plasma');
   assert.deepEqual(q1.molecular.map(m => m.id), ['gene:il18']);
   assert.doesNotMatch(q1.text, /a quantity measured in a sample/i);
@@ -158,6 +158,10 @@ test('Q5 never infers utility, and the ladder marks each rung', () => {
   const rungs = Object.fromEntries(ladder(IL18.entity, IL18.rows).map(r => [r.key, r.indexed]));
   assert.deepEqual(rungs, { discovery: true, biology: false, analytical: true, clinical: true, incremental: false, utility: false });
   assert.deepEqual(ladder({}, []).map(r => r.indexed), [false, false, false, false, false, false]);
+  // A guideline statement belongs in Q5, but it does not light the utility rung.
+  const guidanceOnly = ladder(IL18.entity, [{ finding: { id: 'g1', kind: 'guideline', statement: 'Guidance mentions it.' }, quote: 'Guidance mentions it.' }]);
+  assert.equal(guidanceOnly.find(r => r.key === 'utility').indexed, false);
+  assert.equal(utility(IL18.entity, [{ finding: { id: 'g1', kind: 'guideline' }, quote: 'x' }]).state, 'indexed');
 });
 
 test('scope note names the population the evidence came from, and the questions follow the route', () => {

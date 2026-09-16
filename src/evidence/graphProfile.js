@@ -190,7 +190,8 @@ export function identity(entity={},related=[]){
   return {
     label:id.entity_class||objectKind(entity).label,
     curated:Boolean(id.entity_class),
-    text:id.entity_class?`${entity.name} is ${/^[aeiou]/i.test(id.entity_class)?'an':'a'} ${id.entity_class.toLowerCase()}.`:objectKind(entity).text,
+    // Lower-case only the leading ordinary word: IL-1, MUC16 and NGS keep their case.
+    text:id.entity_class?`${entity.name} is ${/^[aeiou]/i.test(id.entity_class)?'an':'a'} ${id.entity_class.replace(/^[A-Z][a-z]+/,w=>w.toLowerCase())}.`:objectKind(entity).text,
     specimen:id.specimen||null,
     aliases:(entity.aliases||[]).filter(a=>a!==entity.name),
     molecular,
@@ -280,7 +281,7 @@ export function utility(entity={},rows=[]){
 // The ladder: which rungs the graph can speak to at all.
 export const RUNGS=['discovery','biology','analytical','clinical','incremental','utility'];
 const RUNG_LABELS={discovery:'Discovery',biology:'Biology',analytical:'Analytical validation',clinical:'Clinical validation',incremental:'Incremental value',utility:'Clinical utility'};
-const RUNG_ASKS={discovery:'Is it reported at all?',biology:'Is there a mechanism or laboratory finding?',analytical:'Do the findings name an assay?',clinical:'Association, discrimination, classification or prognosis?',incremental:'Does it add to the tools already in use?',utility:'Does using it change decisions or outcomes?'};
+const RUNG_ASKS={discovery:'Is it reported at all?',biology:'Is there a mechanism or laboratory finding?',analytical:'Do the findings name an assay?',clinical:'Association, discrimination, classification or prognosis?',incremental:'Does it add to the tools already in use?',utility:'Does using it change decisions or outcomes? Guidance alone does not count.'};
 const INCREMENTAL=/\badded to\b|\bincremental\b|\bbeyond\b|\bin addition to\b|\bcombined with\b|\bversus\b/i;
 export function ladder(entity={},rows=[]){
   const list=flatten(rows);
@@ -291,7 +292,8 @@ export function ladder(entity={},rows=[]){
     analytical:list.some(f=>f.assay),
     clinical:has(['association','discrimination','classification','prognosis','effect']),
     incremental:list.some(f=>f.measure==='delta_c_index'||INCREMENTAL.test(`${f.target||''} ${f.marker||''} ${f.comparator||''}`)),
-    utility:has(['utility','guideline']),
+    // A guideline statement is not evidence that measuring changes outcomes; only a utility finding is.
+    utility:has(['utility']),
   };
   return RUNGS.map(key=>({key,label:RUNG_LABELS[key],asks:RUNG_ASKS[key],indexed:state[key]}));
 }
