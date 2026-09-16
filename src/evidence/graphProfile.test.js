@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions} from './graphProfile.js';
+import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,shouldRetry,RETRY_DELAYS,fetchWithRetry} from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -199,4 +199,36 @@ test('scope note names the population the evidence came from, and the questions 
   assert.equal(questions('precision_oncology')[3], 'Is it prognostic, or predictive of treatment benefit?');
   assert.equal(questions('diagnostic')[4], 'Does using the test change outcomes or harms?');
   assert.equal(questions('anything')[0], 'What is it?');
+});
+
+test('a restarting engine is retried; an answer is not', () => {
+  for (const transient of ['network', 502, 503, 504, 429, 500]) assert.equal(shouldRetry(transient), true, String(transient));
+  // 404 means no such entity and 400 means a bad request: retrying either just repeats the answer.
+  for (const answer of [404, 400, 401, 403, 422]) assert.equal(shouldRetry(answer), false, String(answer));
+  assert.equal(RETRY_DELAYS.length, 2, 'three attempts in total');
+  assert.ok(RETRY_DELAYS.every(ms => ms >= 1000) && RETRY_DELAYS.at(-1) <= 10000);
+  assert.ok(RETRY_DELAYS[1] > RETRY_DELAYS[0], 'the wait grows');
+});
+
+test('the retry loop recovers from a restarting engine and gives up on an answer', async () => {
+  const slept = [], sleep = ms => { slept.push(ms); return Promise.resolve(); };
+  const failing = outcome => Object.assign(new Error('request_failed'), { outcome });
+
+  let calls = 0;
+  const recovers = await fetchWithRetry(() => { calls += 1; if (calls < 3) throw failing(503); return Promise.resolve({ ok: true }); }, { sleep });
+  assert.deepEqual([recovers, calls, slept], [{ ok: true }, 3, RETRY_DELAYS]);
+
+  // Three attempts and no more, so a page never hammers an engine that stays down.
+  let attempts = 0;
+  await assert.rejects(fetchWithRetry(() => { attempts += 1; throw failing(502); }, { sleep, delays: [10, 20] }));
+  assert.equal(attempts, 3);
+
+  // A 404 is the answer "no such entity": it is returned to the caller at once, unretried.
+  let asked = 0;
+  await assert.rejects(fetchWithRetry(() => { asked += 1; throw failing(404); }, { sleep }), /request_failed/);
+  assert.equal(asked, 1);
+
+  const seen = [];
+  await fetchWithRetry(() => (seen.length < 1 ? Promise.reject(failing(503)) : Promise.resolve('done')), { sleep, onRetry: n => seen.push(n) });
+  assert.deepEqual(seen, [1]);
 });

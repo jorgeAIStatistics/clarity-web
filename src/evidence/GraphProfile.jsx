@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,LAYERS} from './graphProfile.js';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -60,22 +60,29 @@ export function useGraphEntity(slug,type='biomarker',attempt=0){
   const [state,setState]=useState({status:'loading'});
   useEffect(()=>{
     if(!slug){setState({status:'missing'});return undefined;}
-    let active=true;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
+    let active=true,inFlight=null,waiting=null;
     setState({status:'loading'});
     // Variants and genes share the biomarker address space; a biomarker id wins when both exist.
-    const load=async()=>{
-      for(const prefix of graphPrefixes(type)){
-        const r=await fetch(`${API_BASE}/api/evidence/graph/entity/${prefix}:${encodeURIComponent(slug)}`,{signal:controller.signal});
-        if(r.status===404)continue;
-        if(!r.ok)throw Error(String(r.status));
-        return r.json();
-      }
-      return null;
+    const once=async()=>{
+      // Each attempt gets its own controller: a timed-out signal cannot be reused by the next try.
+      const controller=new AbortController();inFlight=controller;
+      const timer=setTimeout(()=>controller.abort(),15000);
+      try{
+        for(const prefix of graphPrefixes(type)){
+          const response=await fetch(`${API_BASE}/api/evidence/graph/entity/${prefix}:${encodeURIComponent(slug)}`,{signal:controller.signal});
+          if(response.status===404)continue;
+          if(!response.ok)throw Object.assign(Error('request_failed'),{outcome:response.status});
+          return response.json();
+        }
+        return null;
+      }finally{clearTimeout(timer);}
     };
-    load().then(data=>{if(active)setState(data?{status:'ready',data}:{status:'missing'});})
-      .catch(()=>{if(active)setState({status:'error'});})
-      .finally(()=>clearTimeout(timer));
-    return()=>{active=false;clearTimeout(timer);controller.abort();};
+    fetchWithRetry(once,{
+      sleep:ms=>new Promise(resolve=>{waiting=setTimeout(resolve,ms);}),
+      onRetry:tries=>{if(active)setState({status:'retrying',attempt:tries});},
+    }).then(data=>{if(active)setState(data?{status:'ready',data}:{status:'missing'});})
+      .catch(()=>{if(active)setState({status:'error'});});
+    return()=>{active=false;clearTimeout(waiting);inFlight?.abort();};
   },[slug,type,attempt]);
   return state;
 }
@@ -111,7 +118,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
   const [attempt,setAttempt]=useState(0);
   const state=useGraphEntity(slug,type,attempt);
 
-  if(state.status==='loading')return <div className="gp" aria-busy="true"><div className="ev-hero"><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><div className="gp-skeleton gp-skeleton-title"/><div className="gp-skeleton"/></div><ul className="gp-layers" aria-hidden="true">{LAYERS.map(l=><li key={l} className="gp-layer gp-layer-skeleton"/>)}</ul><p className="ev-note" role="status">Loading the graph profile…</p></div>;
+  if(state.status==='loading'||state.status==='retrying')return <div className="gp" aria-busy="true"><div className="ev-hero"><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><div className="gp-skeleton gp-skeleton-title"/><div className="gp-skeleton"/></div><ul className="gp-layers" aria-hidden="true">{LAYERS.map(l=><li key={l} className="gp-layer gp-layer-skeleton"/>)}</ul><p className="ev-note" role="status">{state.status==='retrying'?'The evidence engine is waking up. Retrying…':'Loading the graph profile…'}</p></div>;
   if(state.status==='missing')return <div className="gp"><Hero name="Page not found" go={go} type={type}/><section className="ev-panel"><h2>This evidence page does not exist</h2><p>No biomarker in the Clarity graph uses this address.</p><Link to="/biomarkers" go={go}>Return to biomarkers</Link></section></div>;
   if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><p>The evidence engine may be starting up. Try again in a minute.</p><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
 

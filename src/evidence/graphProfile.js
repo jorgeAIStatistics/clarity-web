@@ -340,3 +340,27 @@ export function scopeNote(entity={},rows=[]){
   if(!where.length)return `Indexed findings do not state the population they came from, so their scope is unknown.`;
   return `Indexed evidence is currently from ${listWords(where)}. Other uses of ${entity.name} are not indexed here, and absence is not evidence against them.`;
 }
+
+// ---- Retry policy ---------------------------------------------------------
+// The engine restarts on every deploy and answers 502/503, or nothing at all, for a few seconds.
+// A page loaded in that window should recover by itself. A 404 is an answer, not a failure.
+export const RETRY_DELAYS=[1500,4000];
+export function shouldRetry(outcome){
+  if(outcome==='network')return true;
+  return [408,425,429,500,502,503,504].includes(Number(outcome));
+}
+
+// The loop is separated from React so it can be tested with a fake clock and a fake request.
+// An error carrying `outcome` is an HTTP status; anything else is treated as a network failure.
+export async function fetchWithRetry(attemptOnce,{delays=RETRY_DELAYS,sleep,onRetry}={}){
+  const wait=sleep||(ms=>new Promise(resolve=>setTimeout(resolve,ms)));
+  for(let tries=0;;tries++){
+    try{
+      return await attemptOnce(tries);
+    }catch(error){
+      if(tries>=delays.length||!shouldRetry(error?.outcome??'network'))throw error;
+      onRetry?.(tries+1);
+      await wait(delays[tries]);
+    }
+  }
+}
