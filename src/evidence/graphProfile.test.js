@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,shouldRetry,RETRY_DELAYS,fetchWithRetry,externalLinks,idCaption} from './graphProfile.js';
+import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,shouldRetry,RETRY_DELAYS,fetchWithRetry,externalLinks,idCaption,kindBadge} from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -244,4 +244,15 @@ test('identifiers link to the registry that issued them, and the caption says wh
   assert.match(idCaption({ kind: 'Variant' }), /gene and protein this variant alters/);
   assert.match(idCaption({ kind: 'Gene' }), /protein and any variant of it are separate/);
   assert.match(idCaption({ kind: 'Biomarker' }), /gene that encodes it and the protein that is measured/);
+});
+
+test('a library card says which kinds it holds and whether utility is among them', () => {
+  const card = kindBadge({ coverage: { quantified_outcomes: 5 }, finding_kinds: { classification: 3, discrimination: 2 }, utility_indexed: false });
+  assert.equal(card.text, '3 classification · 2 discrimination');
+  assert.deepEqual([card.kinds, card.utility], [['classification', 'discrimination'], false]);
+  const many = kindBadge({ coverage: { quantified_outcomes: 9 }, finding_kinds: { classification: 4, prognosis: 3, association: 1, guideline: 1 }, utility_indexed: true });
+  assert.equal(many.text, '4 classification · 3 prognosis · +2 more');
+  assert.equal(many.utility, true);
+  assert.equal(kindBadge({ coverage: { quantified_outcomes: 0 } }).text, 'Not in this library yet');
+  assert.deepEqual(kindBadge({}).kinds, []);
 });

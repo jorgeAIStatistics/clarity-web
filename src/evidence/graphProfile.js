@@ -387,3 +387,14 @@ export function idCaption(entity={}){
   if(kind==='Gene'||kind==='gene')return 'Gene identifiers. The protein and any variant of it are separate objects here.';
   return 'These identify the gene that encodes it and the protein that is measured.';
 }
+
+// What a library card should say: which kinds of finding a page holds, and whether anything
+// speaks to using the marker. "3 findings" hides that all three are accuracy and none is utility.
+export function kindBadge(entry={}){
+  const kinds=Object.entries(entry.finding_kinds||{}).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+  const total=entry.coverage?.quantified_outcomes||kinds.reduce((sum,[,n])=>sum+n,0);
+  if(!total)return {text:'Not in this library yet',kinds:[],utility:false};
+  const shown=kinds.slice(0,2).map(([kind,n])=>`${n} ${kind}`);
+  if(kinds.length>2)shown.push(`+${kinds.length-2} more`);
+  return {text:shown.join(' · ')||`${total} typed ${total===1?'finding':'findings'}`,kinds:kinds.map(([kind])=>kind),utility:Boolean(entry.utility_indexed)};
+}

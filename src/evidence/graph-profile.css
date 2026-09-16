@@ -96,3 +96,5 @@
 .gp-ids li{display:flex;align-items:baseline;gap:7px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;background:#111722}
 .gp-ids small{font:10px ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
 .gp-ids .ev-note{margin:0;max-width:78ch}
+
+.gp-card-gap{color:#d8c48a}

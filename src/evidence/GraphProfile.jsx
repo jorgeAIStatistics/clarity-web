@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,kindBadge,LAYERS} from './graphProfile.js';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -230,12 +230,16 @@ export function useGraphBiomarkers(enabled=true){
   return state;
 }
 function Card({entity,go}){
-  const n=entity.coverage.quantified_outcomes;
+  const badge=kindBadge(entity);
   return <a className="ev-entity-card" href={entity.path} onClick={ev=>{if(!ev.metaKey&&!ev.ctrlKey&&!ev.shiftKey&&!ev.altKey&&ev.button===0){ev.preventDefault();go(entity.path);}}}>
     <div className="ev-entity-card-top"><span>{entity.category} · evidence graph</span></div>
     <h3>{entity.name}</h3>
     <p>{(entity.aliases||[]).filter(a=>a!==entity.name).slice(0,3).join(' · ')||'No other names indexed'}</p>
-    <div className="ev-entity-card-bottom"><span>{n>0?`${n} typed ${n===1?'finding':'findings'}`:'Not in this library yet'}</span><span>{entity.coverage.linked_studies} publications</span></div>
+    <div className="ev-entity-card-bottom">
+      <span>{badge.text}</span>
+      {badge.kinds.length>0&&!badge.utility&&<span className="gp-card-gap">no utility finding</span>}
+      <span>{entity.coverage.linked_studies} publications</span>
+    </div>
   </a>;
 }
 
