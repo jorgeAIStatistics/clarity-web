@@ -97,3 +97,11 @@ export function deadLetterText(d){
   if(!reasons.length)return 'no typed finding passed validation';
   return reasons.map(([k,n])=>`${REJECTIONS[k]||k.replaceAll('_',' ')}${n>1?` (${n}×)`:''}`).join('; ');
 }
+
+// Graph entities the bundled catalog does not profile, filtered by the index search box and
+// ordered so pages with typed findings come before GAP pages.
+export function graphMatches(rows,query=''){
+  const q=String(query||'').trim().toLowerCase();
+  return (rows||[]).filter(e=>[e.name,e.category,...(e.aliases||[])].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>(b.coverage.quantified_outcomes-a.coverage.quantified_outcomes)||a.name.localeCompare(b.name));
+}

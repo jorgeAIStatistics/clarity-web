@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText} from './graphProfile.js';
+import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches} from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -41,4 +41,17 @@ test('relations and dead-letters read in plain language',()=>{
   assert.equal(relationLabel({edge:'RELATED_TO',reason:'same_pathway'}),'Same pathway');
   assert.equal(deadLetterText({reasons:{rejected_missing_fields:5}}),'a measure was named, but its value or required fields were not in the passage (5×)');
   assert.equal(deadLetterText({reasons:{}}),'no typed finding passed validation');
+});
+
+test('the index search matches graph entities by name, alias or category and ranks findings first', () => {
+  const rows = [
+    { id: 'graph:biomarker:ca-125', name: 'CA-125', category: 'Molecular marker', aliases: ['CA125'], coverage: { quantified_outcomes: 0 } },
+    { id: 'graph:variant:egfr-activating-mutation', name: 'EGFR activating mutation', category: 'Variant', aliases: ['EGFR mutation'], coverage: { quantified_outcomes: 2 } },
+    { id: 'graph:biomarker:chromogranin-a', name: 'Chromogranin A', category: 'Molecular marker', aliases: ['CgA'], coverage: { quantified_outcomes: 2 } },
+  ];
+  assert.deepEqual(graphMatches(rows).map(r => r.name), ['Chromogranin A', 'EGFR activating mutation', 'CA-125']);
+  assert.deepEqual(graphMatches(rows, 'cga').map(r => r.name), ['Chromogranin A']);
+  assert.deepEqual(graphMatches(rows, 'EGFR mutation').map(r => r.name), ['EGFR activating mutation']);
+  assert.deepEqual(graphMatches(rows, 'variant').map(r => r.name), ['EGFR activating mutation']);
+  assert.deepEqual(graphMatches(null, 'x'), []);
 });
