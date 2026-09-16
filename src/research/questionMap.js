@@ -2,7 +2,7 @@
 // researcher's own aggregate results can sit on, rule-based tensions and one next research step.
 // Deterministic and provisional. Nothing is pooled, converted or judged as support or contradiction.
 import { LAYERS, coverageBand, inferMode, plainPopulation, list } from '../profile/meaningModel.js';
-import { measureFamily, describeEffect, intervalSide, validInterval, num } from '../evidence/measures.js';
+import { measureFamily, describeEffect, intervalSide, summarizeSides, validInterval, num } from '../evidence/measures.js';
 import { validRecord } from '../profile/visualModel.js';
 import { classificationRows, aucStrip } from '../evidence/graphProfile.js';
 
@@ -142,7 +142,7 @@ export function compareUser(panel) {
 
 // One panel per measure family and question type. A user row joins a panel only when outcome,
 // family and question type all match; otherwise it gets its own axis with the reason stated.
-export function landscapePanels(estimates, outcome, userRows = []) {
+export function landscapePanels(estimates, outcome, userRows = [], { marker = null } = {}) {
   const panels = new Map(), key = (fam, mode) => `${fam.key}|${mode}`;
   for (const e of estimates.filter(e => e.outcome === outcome)) {
     const k = key(e.fam, e.mode);
@@ -155,7 +155,7 @@ export function landscapePanels(estimates, outcome, userRows = []) {
     if (panels.has(k)) { panels.get(k).user.push(r); continue; }
     panels.set(k, { key: k, fam: r.fam, mode: r.mode, published: [], user: [r], note: hadPublished ? `No published ${r.fam.label} estimate for ${r.mode.toLowerCase()} on this outcome, so your row has its own axis.` : 'No published estimate for this outcome yet, so your row has its own axis.' });
   }
-  return [...panels.values()].map(p => ({ ...p, comparison: compareUser(p) }));
+  return [...panels.values()].map(p => ({ ...p, marker, comparison: compareUser(p) }));
 }
 
 export const utilityRecordCount = result => (result?.copilot?.groups || []).find(g => g.id === 'utility')?.study_ids?.length || 0;
@@ -271,4 +271,121 @@ export function cellAccuracy(examples, entityId) {
       quote: f.quote, pmid: x.pmid || (String(x.id).startsWith('pmid:') ? String(x.id).slice(5) : null), study_id: x.id,
     })));
   return { table: classificationRows(rows), strip: aucStrip(rows) };
+}
+
+// ---- Briefing -------------------------------------------------------------
+// Five to ten plain sentences that answer the question that was asked, written only from the
+// records retrieved for it. Deterministic: when the evidence for a sentence is missing, the
+// briefing says what is missing instead of softening it. Nothing is pooled or converted.
+export const BRIEFING_VERSION = 'question-briefing-v1';
+const plural = (n, one, many = `${one}s`) => `${Number(n).toLocaleString('en-US')} ${n === 1 ? one : many}`;
+const INTENT_ASKS = {
+  association: 'whether it is associated with the outcome',
+  prediction: 'whether it adds to prediction beyond the models already in use',
+  utility: 'whether acting on it improves outcomes',
+  mechanism: 'whether there is a biological mechanism',
+  guideline: 'what guidance says',
+  enrichment: 'whether it can select who enters a trial',
+};
+const shortTitle = t => { const w = String(t || '').replace(/\.$/, '').split(/\s+/); return w.slice(0, 4).join(' ') + (w.length > 4 ? '…' : ''); };
+// Distance from the measure's no-difference value, so the sentence quotes the largest reported effect.
+const magnitude = e => (e.fam?.scale === 'log' ? Math.abs(Math.log(e.point || 1)) : Math.abs(e.point - (e.fam?.nullValue ?? 0)));
+function limitRepeats(sentences, phrase, max = 2) {
+  if (!phrase) return sentences;
+  const re = new RegExp(String(phrase).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  let seen = 0;
+  return sentences.map(s => ({ ...s, text: s.text.replace(re, m => (++seen > max ? 'that outcome' : m)) }));
+}
+export const leadMarker = matrix => (matrix?.rows || []).find(r => r.primary && MARKERS.includes(r.type))?.name || null;
+
+export function briefing({ result, matrix, intents = [], estimates = [], userRows = [], comparisons = [], questionFields = {}, outcome = '' } = {}) {
+  if (!matrix?.rows?.length) return null;
+  const say = [], add = (kind, text) => { if (text && say.length < 10 && !say.some(s => s.kind === kind)) say.push({ kind, text }); };
+  const asked = intents.filter(i => i.asked);
+  const named = matrix.rows.filter(r => r.primary && !r.temporary);
+  const rows = named.length ? named : matrix.rows.slice(0, 2);
+  const markers = rows.filter(r => MARKERS.includes(r.type));
+  const lead = markers[0] || rows[0], second = markers.find(r => r.id !== lead.id);
+  const population = (questionFields.population || [])[0] || '';
+  const endpoint = (questionFields.outcomes || [])[0] || outcome || '';
+  const cell = (row, layer) => row.cells.find(c => c.layer === layer) || { count: 0 };
+
+  add('question', `Your question puts ${list(rows.map(r => r.name))}${population ? ` in ${lowerFirst(population)}` : ''}${endpoint ? ` against ${lowerFirst(endpoint)}` : ''}, and asks ${asked.length ? list(asked.map(i => INTENT_ASKS[i.key] || i.label.toLowerCase())) : 'what the indexed literature holds'}.`);
+
+  const association = estimates.filter(e => e.mode === 'Association' && e.fam?.directional);
+  if (association.length) {
+    const strongest = [...association].sort((a, b) => magnitude(b) - magnitude(a))[0];
+    const { sides } = summarizeSides(association), clear = sides.below + sides.above;
+    add('association', `On association, the retrieved records give ${plural(association.length, 'estimate')}, the largest ${describeEffect(strongest).number} for ${lowerFirst(strongest.outcome)}${association.length > 1 ? `, with ${clear} of ${association.length} intervals excluding no difference` : ''}. These are observational contrasts, not evidence that changing ${lead.name} changes anything.`);
+  } else if (asked.some(i => i.key === 'association')) {
+    add('association_gap', `No retrieved record reports an association estimate for ${lead.name} with an interval, so that part of the question is unanswered in this index.`);
+  }
+
+  const prediction = estimates.filter(e => ['c_index_change', 'c_index'].includes(e.fam?.key));
+  const changes = prediction.filter(e => e.fam.key === 'c_index_change');
+  if (changes.length) {
+    const max = Math.max(...changes.map(e => Math.abs(e.point)));
+    add('prediction', `On prediction, adding ${lead.name} to models that already hold the standard risk factors${second ? ` and ${second.name}` : ''} moves the C-index by at most ${num(max)} on a 0.5–1 scale (${plural(changes.length, 'analysis', 'analyses')}). Being associated with risk and improving a risk model are different results.`);
+  } else if (prediction.length) {
+    add('prediction', `Discrimination is reported as ${list(prediction.slice(0, 3).map(e => describeEffect(e).number))}; a C-index on its own does not show what ${lead.name} adds to an existing model.`);
+  } else if (asked.some(i => i.key === 'prediction')) {
+    add('prediction_gap', `No retrieved record reports a change in discrimination or reclassification for ${lead.name}, so what it adds to existing prediction is unanswered here.`);
+  }
+
+  const utility = utilityRecordCount(result);
+  const treatment = estimates.filter(e => e.mode === 'Treatment outcomes');
+  if (asked.some(i => i.key === 'utility') || treatment.length) {
+    if (utility) add('utility', `${plural(utility, 'retrieved record')} ${utility === 1 ? 'tests' : 'test'} ${lead.name}-guided care itself; read ${utility === 1 ? 'it' : 'those'} before the trial rows.`);
+    else if (treatment.length) add('utility_gap', `No retrieved record tests ${lead.name}-guided care. The ${plural(treatment.length, 'trial estimate')} shown come from drug trials (${list([...new Set(treatment.map(e => shortTitle(e.title)))].slice(0, 3))}), which measure what a treatment did — not what measuring ${lead.name} adds to a decision.`);
+    else add('utility_gap', `No retrieved trial tests whether acting on ${lead.name} changes outcomes, so clinical utility is unanswered here.`);
+  }
+
+  if (asked.some(i => i.key === 'guideline')) {
+    const guidance = rows.reduce((n, r) => n + cell(r, 'guidelines').count, 0);
+    add(guidance ? 'guideline' : 'guideline_gap', guidance
+      ? `${plural(guidance, 'guideline or regulatory record')} ${guidance === 1 ? 'is' : 'are'} linked in the guidance column.`
+      : `No guideline or regulatory record is linked for ${list(rows.map(r => r.name))}, so what guidance says is not shown here.`);
+  }
+
+  const askedLayers = [...new Set(asked.map(i => i.layer))];
+  const empty = rows.flatMap(r => askedLayers.filter(l => !cell(r, l).count).map(l => `${LAYERS.find(x => x.key === l).short.toLowerCase()} for ${r.name}`));
+  if (empty.length) add('gap', `Empty in this index: ${list(empty.slice(0, 4))}${empty.length > 4 ? `, and ${empty.length - 4} more cells` : ''}. An empty cell means Clarity holds no matching record, not that no such study exists.`);
+
+  if (comparisons.length) add('user', comparisons[0].text);
+  else if (userRows.some(r => r.placeable)) add('user', `Your ${plural(userRows.filter(r => r.placeable).length, 'uploaded row')} can be placed on the landscape; choose the matching outcome to see ${userRows.filter(r => r.placeable).length === 1 ? 'it' : 'them'} beside the published estimates.`);
+
+  const reviewed = estimates.filter(e => e.review === 'reviewed').length;
+  add('review', `${plural((result?.studies || []).length, 'record')} were retrieved for this question; ${reviewed ? `${reviewed} of ${estimates.length} estimates come from reviewed records and the rest are automated extractions` : 'every estimate here is an automated extraction that no expert has reviewed'}.`);
+
+  return { version: BRIEFING_VERSION, sentences: limitRepeats(say, endpoint), basis: `Built from the ${plural((result?.studies || []).length, 'record')} retrieved for this question${userRows.length ? ' and your uploaded table' : ''}. Automated, provisional, and never pooled across studies.` };
+}
+
+// ---- Prediction panel -----------------------------------------------------
+// Grounded C-index and Δ C-index estimates, kept apart from association forests because a model
+// comparison answers a different question. Shown for the whole question, not one outcome.
+export function predictionRows(estimates) {
+  return estimates.filter(e => ['c_index_change', 'c_index'].includes(e.fam?.key) && Number.isFinite(e.point) && e.quote)
+    .map(e => ({ id: e.id, key: e.fam.key, label: e.fam.label, pmid: e.pmid, url: e.url, title: e.title, year: e.year, point: e.point, lower: e.lower, upper: e.upper,
+      number: describeEffect(e).number, side: intervalSide(e.fam, e.lower, e.upper), added: e.exposure || e.unit || null, comparator: e.comparator || null, unit: e.unit || null,
+      outcome: e.outcome, quote: e.quote, design: e.design, layer: e.layer, review: e.review === 'reviewed' ? 'reviewed' : 'automated' }))
+    .sort((a, b) => Math.abs(b.point) - Math.abs(a.point));
+}
+
+export function predictionReading(rows) {
+  if (!rows.length) return null;
+  const changes = rows.filter(r => r.key === 'c_index_change');
+  const clear = rows.filter(r => r.side === 'below' || r.side === 'above').length;
+  const reviewed = rows.filter(r => r.review === 'reviewed').length;
+  return {
+    title: 'Does it add to prediction beyond the models already in use?',
+    sentences: [
+      changes.length
+        ? `Each row adds the marker to a model that already exists and reports the change in the C-index; the largest here is ${num(Math.max(...changes.map(r => Math.abs(r.point))))} on a scale where 0.5 is chance and 1 is perfect ordering.`
+        : 'Each row reports discrimination (C-index or AUC) for one model, not the change from adding the marker to an existing one.',
+      `${clear} of ${rows.length} ${rows.length === 1 ? 'interval excludes' : 'intervals exclude'} no change.`,
+      'A C-index compares how well models rank people. It does not show calibration, whether anyone crosses a decision threshold, or that care changed.',
+      reviewed ? `${reviewed} of ${rows.length} rows come from reviewed records.` : 'All rows are automated extractions; none is expert-reviewed.',
+    ],
+    limits: 'Limits: each analysis uses its own base model, cohort and outcome definition; values are shown exactly as reported and are never pooled. The “added to” column states what each study actually put into the model.',
+  };
 }

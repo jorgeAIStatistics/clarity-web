@@ -40,7 +40,9 @@ export function forestCaption(panel) {
     detail = !withInterval.length ? ' are shown without intervals, so precision is unknown' : `: ${parts.join(', ')} no difference${withInterval.length < published.length ? ` (${published.length - withInterval.length} without an interval)` : ''}`;
   }
   const user = panel.comparison?.[0] ? ` Your estimate sits ${panel.comparison[0].position}.` : '';
-  return `${lead}${detail}.${user}`;
+  // A treatment forest is the easiest figure to misread as marker-guided care; say so in the caption itself.
+  const utility = panel.mode === 'Treatment outcomes' && panel.marker ? ` These are treatment effects, not evidence that ${panel.marker}-guided care improves outcomes.` : '';
+  return `${lead}${detail}.${user}${utility}`;
 }
 
 const MODE_LIMITS = {

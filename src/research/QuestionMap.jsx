@@ -10,7 +10,7 @@ import { loadVisualSnapshot } from '../profile/useVisualReport.js';
 import { axisFor } from '../profile/visualModel.js';
 import { LAYERS, BANDS, list } from '../profile/meaningModel.js';
 import { describeEffect, measureFamily, num } from '../evidence/measures.js';
-import { DEMO, MAP_VERSION, mapFailure, readJson, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount, cellFindings, cellAccuracy } from './questionMap.js';
+import { DEMO, MAP_VERSION, mapFailure, readJson, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, pubmedSearch, utilityRecordCount, cellFindings, cellAccuracy, briefing, predictionRows, predictionReading, leadMarker } from './questionMap.js';
 import { AccuracyFigures } from '../evidence/GraphProfile.jsx';
 import { readResultTable, RESULT_ROLES } from './resultTable.js';
 import './questionMap.css';
@@ -183,10 +183,12 @@ export default function QuestionMap() {
   const questionFields = useMemo(() => ({ population: edits?.population ? [edits.population] : result?.copilot?.question?.population || [], outcomes: edits?.outcome ? [edits.outcome] : result?.copilot?.question?.outcomes || [] }), [edits, result]);
   const options = useMemo(() => outcomeOptions(estimates, userRows, questionFields.outcomes), [estimates, userRows, questionFields]);
   const current = options.some(o => o.name === outcome) ? outcome : options[0]?.name || '';
-  const panels = useMemo(() => landscapePanels(estimates, current, userRows), [estimates, current, userRows]);
+  const panels = useMemo(() => landscapePanels(estimates, current, userRows, { marker: matrix ? leadMarker(matrix) : null }), [estimates, current, userRows, matrix]);
   const comparisons = panels.flatMap(p => p.comparison);
   const tensions = matrix ? mapTensions({ matrix, intents, estimates, result, comparisons }) : [];
   const next = matrix ? nextStep({ matrix, intents, estimates, question: questionFields, comparisons, outcome: current, utilityRecords: utilityRecordCount(result) }) : null;
+  const predictionSet = predictionRows(estimates), prediction = { rows: predictionSet, reading: predictionReading(predictionSet) };
+  const brief = matrix ? briefing({ result, matrix, intents, estimates, userRows, comparisons, questionFields, outcome: current }) : null;
 
   useEffect(() => () => controller.current?.abort(), []);
   // A new map takes the first screen: panel A at the top, heatmap and landscape directly beneath.
@@ -299,8 +301,13 @@ export default function QuestionMap() {
     </div>}
 
     {ready && !busy && <div className="qm-map">
+      {brief && <section className="qm-panel qm-briefing" aria-labelledby="qm-brief">
+        <Head id="qm-brief" letter="0" title="What the retrieved evidence says about this question" headingRef={mapHeading}><span className="qm-tag">Automated</span></Head>
+        <ol className="qm-brief">{brief.sentences.map(s => <li key={s.kind} data-kind={s.kind}>{s.text}</li>)}</ol>
+        <p className="qm-note">{brief.basis}</p>
+      </section>}
       <section className="qm-panel qm-intent" aria-labelledby="qm-a">
-        <Head id="qm-a" letter="A" title="What your question asks" headingRef={mapHeading}><button type="button" className="qm-button qm-ghost" onClick={() => setEditingIntent(v => !v)}><Pencil size={14} aria-hidden="true" /> Edit</button></Head>
+        <Head id="qm-a" letter="A" title="What your question asks" headingRef={brief ? undefined : mapHeading}><button type="button" className="qm-button qm-ghost" onClick={() => setEditingIntent(v => !v)}><Pencil size={14} aria-hidden="true" /> Edit</button></Head>
         <p className="qm-restatement">{restatement}{edits && <span className="qm-tag">Edited</span>}</p>
         {result.parse?.mode === 'rules' && <p className="qm-need">{result.copilot.question.note}</p>}
         <div className="qm-intent-row">
@@ -327,6 +334,21 @@ export default function QuestionMap() {
             : <p>No quote-backed estimates were retrieved for these profiles. Open a heatmap cell to read the records.</p>}
           {panels.map(p => <React.Fragment key={p.key}><Forest panel={p} /><EffectDistribution panel={p} /></React.Fragment>)}
           {panels.length > 0 && <div className="qm-legend"><span><i className="qm-dot" style={{ background: LAYER_COLOR.interventional }} />Human trial</span><span><i className="qm-dot" style={{ background: LAYER_COLOR.observational }} />Observational</span><span><i className="qm-dot" style={{ background: '#9fb3c4' }} />Synthesis or other</span><span><i className="qm-diamond" />Your study</span></div>}
+          {prediction.rows.length > 0 && <figure className="qm-pred">
+            <figcaption><strong>{prediction.reading.title}</strong><span>{prediction.rows.length} reported {prediction.rows.length === 1 ? 'analysis' : 'analyses'} · every outcome in this question · nothing pooled</span></figcaption>
+            <div className="qm-scroll"><table>
+              <thead><tr><th scope="col">Source</th><th scope="col">Added to the model</th><th scope="col">Reported value</th><th scope="col">Interval vs no change</th></tr></thead>
+              <tbody>{prediction.rows.map(r => <tr key={r.id}>
+                <th scope="row">{safeSource(r.url) ? <a href={safeSource(r.url)} target="_blank" rel="noreferrer">{r.pmid ? `PMID ${r.pmid}` : r.title}</a> : <span>{r.title || r.pmid}</span>}<small>{[r.year, r.design].filter(Boolean).join(' · ')}</small></th>
+                <td>{r.added || r.unit || 'Not stated in the record'}{r.comparator && <small>versus {r.comparator}</small>}</td>
+                <td className="qm-num">{r.number}</td>
+                <td>{r.side === 'includes' ? 'Includes no change' : r.side ? 'Excludes no change' : 'No interval reported'}</td>
+              </tr>)}</tbody>
+            </table></div>
+            <p className="qm-interpret">{prediction.reading.sentences.join(' ')}</p>
+            <p className="qm-limits">{prediction.reading.limits}</p>
+            <details className="qm-pred-quotes"><summary>Source passages</summary><ul>{prediction.rows.map(r => <li key={r.id}><blockquote>{r.quote}</blockquote><small>{r.pmid ? `PMID ${r.pmid}` : r.title} · {r.outcome}</small></li>)}</ul></details>
+          </figure>}
           {!upload?.placeable?.length && <div className="qm-drop compact" data-active={dragging} {...dropProps}><div><strong>Place your own study on this landscape</strong><span>Drop an aggregate results table here, or choose one.</span></div>{fileInput}</div>}
           {upload && !upload.error && upload.placeable.length > 0 && !panels.some(p => p.user.length) && <p className="qm-note">Your table’s outcomes ({list([...new Set(upload.placeable.map(r => r.outcome))])}) do not match this outcome. Choose one of your outcomes above.</p>}
           {upload && <details className="qm-upload-inline"><summary>Your table: {tableName}</summary><UploadReading upload={upload} name={tableName} onMapping={setMapping} onClear={() => { setTableText(''); setTableName(''); setMapping(null); }} /></details>}

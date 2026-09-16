@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { DEMO, BUSY_MESSAGE, mapFailure, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, sameOutcome } from './questionMap.js';
+import { DEMO, BUSY_MESSAGE, mapFailure, findingLine, detectIntents, coverageMatrix, publishedEstimates, outcomeOptions, landscapePanels, mapTensions, nextStep, composeQuery, referenceOnly, sameOutcome, briefing, predictionRows, predictionReading } from './questionMap.js';
+import { forestCaption } from './figureModel.js';
 import { readResultTable, parseEstimateCell, parseInterval } from './resultTable.js';
 
 const snapshot = JSON.parse(fs.readFileSync(new URL('../../public/visual-evidence.json', import.meta.url))).profiles;
@@ -130,4 +131,47 @@ test('drill-down lines name the observation type and keep accuracy and cut-off f
   assert.equal(findingLine({ observation_type: 'classification', outcome: 'neuroendocrine neoplasms', effect: { measure: 'sensitivity', estimate: 71 }, threshold: 100, threshold_unit: 'ng/mL' }), 'Classification · neuroendocrine neoplasms: Sensitivity 71 at a cut-off of 100 ng/mL');
   assert.equal(findingLine({ observation_type: 'prognosis', outcome: 'overall survival', effect: { measure: 'hazard ratio', estimate: 2.1, lower: 1.3, upper: 3.4, confidence_level: 95 } }), 'Prognosis · overall survival: HR 2.1 (95% CI 1.3 to 3.4)');
   assert.equal(findingLine({ observation_type: 'guideline', outcome: 'Guidelines recommend CgA for monitoring', effect: { measure: 'recommendation' }, statement: 'Guidelines recommend CgA for monitoring' }), 'Guideline · Guidelines recommend CgA for monitoring: Guidelines recommend CgA for monitoring');
+});
+
+const predictionStudy = { id: 'pmid:31216866', pmid: '31216866', url: 'https://pubmed.ncbi.nlm.nih.gov/31216866/', layer: 'observational', design: 'Prospective cohort', title: 'Comparison of Conventional Lipoprotein Tests and Apolipoproteins', entity_ids: ['entity:apob'],
+  findings: [{ outcome: 'Incremental CVD discrimination', effect: { measure: 'C-index change', estimate: 0.0004, lower: 0, upper: 0.0008, confidence_level: 95, units: 'addition of ApoB', origin: 'reported' }, quote: 'C-index change, 0.0004; 95% CI, 0.0000, 0.0008', entity_ids: ['entity:apob'] }] };
+const trialStudy = { id: 'pmid:28304224', pmid: '28304224', url: 'https://pubmed.ncbi.nlm.nih.gov/28304224/', layer: 'interventional', design: 'Randomized controlled trial', title: 'Evolocumab and Clinical Outcomes in Patients with Cardiovascular Disease.', entity_ids: ['entity:ldl-c'],
+  findings: [{ outcome: 'Cardiovascular events', effect: { measure: 'hazard ratio', estimate: 0.85, lower: 0.79, upper: 0.92, confidence_level: 95, origin: 'reported' }, quote: 'hazard ratio, 0.85', entity_ids: ['entity:ldl-c'] }] };
+const briefFixture = { ...result, studies: [...result.studies, predictionStudy, trialStudy] };
+
+test('the briefing answers the asked intents, separates treatment trials from utility, and states what is empty', () => {
+  const matrix = coverageMatrix(briefFixture, DEMO.question), intents = detectIntents(DEMO.question);
+  const estimates = publishedEstimates(briefFixture, {});
+  const brief = briefing({ result: briefFixture, matrix, intents, estimates, questionFields: { population: ['adults without cardiovascular disease'], outcomes: ['cardiovascular events'] } });
+  assert.ok(brief.sentences.length >= 5 && brief.sentences.length <= 10, `sentences: ${brief.sentences.length}`);
+  const kinds = brief.sentences.map(s => s.kind);
+  for (const kind of ['question', 'association', 'prediction', 'utility_gap', 'guideline', 'gap', 'review']) assert.ok(kinds.includes(kind), `missing ${kind}`);
+  const text = brief.sentences.map(s => s.text).join(' ');
+  assert.match(text, /C-index by at most 0\.0004 on a 0\.5–1 scale/);
+  assert.match(text, /No retrieved record tests ApoB-guided care/);
+  assert.match(text, /Evolocumab and Clinical Outcomes/);
+  assert.match(text, /Empty in this index: guidance for LDL-C/);
+  // No placeholder template, and the outcome is never repeated a third time.
+  assert.doesNotMatch(text, /the concepts you named|population to specify|outcome to specify/);
+  assert.ok((text.match(/cardiovascular events/gi) || []).length <= 2);
+  assert.equal(briefing({ matrix: { rows: [] } }), null);
+});
+
+test('prediction estimates get their own panel, not a forest row, and carry their limits', () => {
+  const rows = predictionRows(publishedEstimates(briefFixture, {}));
+  assert.deepEqual(rows.map(r => [r.key, r.point, r.side, r.added]), [['c_index_change', 0.0004, 'includes', 'addition of ApoB']]);
+  const reading = predictionReading(rows);
+  assert.match(reading.sentences[0], /0\.5 is chance/);
+  assert.match(reading.sentences[2], /does not show calibration/);
+  assert.match(reading.limits, /never pooled/);
+  assert.equal(predictionReading([]), null);
+  assert.equal(predictionRows([{ fam: { key: 'hr' }, point: 1.2, quote: 'x' }]).length, 0);
+});
+
+test('a treatment forest says in its caption that it is not marker-guided care', () => {
+  const estimates = publishedEstimates(briefFixture, {});
+  const [panel] = landscapePanels(estimates, 'Cardiovascular events', [], { marker: 'ApoB' }).filter(p => p.mode === 'Treatment outcomes');
+  assert.match(forestCaption(panel), /not evidence that ApoB-guided care improves outcomes/);
+  const association = landscapePanels(estimates, 'Cardiovascular events', [], { marker: 'ApoB' }).find(p => p.mode === 'Association');
+  assert.doesNotMatch(forestCaption(association), /ApoB-guided/);
 });
