@@ -56,9 +56,10 @@ function Hero({name,go,type='biomarker',children}){
   return <div className="ev-hero"><Link className="ev-back" to={path} go={go}><ArrowLeft size={15}/>{back}</Link><div className="ev-eyebrow">{eyebrow} / GRAPH PROFILE · AUTOMATED</div><h1 ref={heading} tabIndex={-1}>{name}</h1>{children}</div>;
 }
 
-export default function GraphProfile({slug,go,type='biomarker'}){
-  const [state,setState]=useState({status:'loading'});const [attempt,setAttempt]=useState(0);
+export function useGraphEntity(slug,type='biomarker',attempt=0){
+  const [state,setState]=useState({status:'loading'});
   useEffect(()=>{
+    if(!slug){setState({status:'missing'});return undefined;}
     let active=true;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
     setState({status:'loading'});
     // Variants and genes share the biomarker address space; a biomarker id wins when both exist.
@@ -76,6 +77,39 @@ export default function GraphProfile({slug,go,type='biomarker'}){
       .finally(()=>clearTimeout(timer));
     return()=>{active=false;clearTimeout(timer);controller.abort();};
   },[slug,type,attempt]);
+  return state;
+}
+
+// A curated profile owns its URL. When the graph also holds typed findings for that entity, they
+// belong on the same page — under the curated reading, never merged into it.
+export function GraphFindings({slug,type='biomarker'}){
+  const state=useGraphEntity(slug,type);
+  if(state.status!=='ready')return null;
+  const {entity,findings}=state.data;
+  const rows=flatten(findings);
+  if(!rows.length)return null;
+  const q4=meaning(entity,findings),q5=utility(entity,findings),scope=scopeNote(entity,findings),rungs=ladder(entity,findings);
+  const strip=aucStrip(findings),table=classificationRows(findings);
+  const inLibrary=rungs.filter(r=>r.indexed).map(r=>r.label),missing=rungs.filter(r=>!r.indexed).map(r=>r.label);
+  return <section className="ev-panel gp-inline" aria-labelledby="gp-inline-title">
+    <h2 id="gp-inline-title">Also in the evidence graph</h2>
+    <p className="ev-note">{rows.length} source-bound {rows.length===1?'finding':'findings'} extracted automatically for {entity.name}, kept separate from the curated reading above. Not expert-reviewed.</p>
+    {scope&&<p className="gp-scope">{scope}</p>}
+    {q4.map(g=><div className="gp-kind" key={g.kind}>
+      <h3>{g.label}<span>{g.rows.length}</span></h3>
+      {g.sentences.map(sentence=><p className="gp-meaning" key={sentence}>{sentence}</p>)}
+      {g.kind==='classification'&&<AccuracyFigures table={table} strip={EMPTY_STRIP}/>}
+      {g.kind==='discrimination'&&<AccuracyFigures table={EMPTY_TABLE} strip={strip}/>}
+      <FindingList rows={g.rows}/>
+    </div>)}
+    <p className="gp-lead" data-gap={q5.state==='empty'||undefined}>{q5.text}</p>
+    <p className="gp-inline-ladder"><span>In this library: {inLibrary.length?inLibrary.join(', '):'nothing yet'}</span><span>Not in this library yet: {missing.length?missing.join(', '):'nothing missing'}</span></p>
+  </section>;
+}
+
+export default function GraphProfile({slug,go,type='biomarker'}){
+  const [attempt,setAttempt]=useState(0);
+  const state=useGraphEntity(slug,type,attempt);
 
   if(state.status==='loading')return <div className="gp" aria-busy="true"><div className="ev-hero"><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><div className="gp-skeleton gp-skeleton-title"/><div className="gp-skeleton"/></div><ul className="gp-layers" aria-hidden="true">{LAYERS.map(l=><li key={l} className="gp-layer gp-layer-skeleton"/>)}</ul><p className="ev-note" role="status">Loading the graph profile…</p></div>;
   if(state.status==='missing')return <div className="gp"><Hero name="Page not found" go={go} type={type}/><section className="ev-panel"><h2>This evidence page does not exist</h2><p>No biomarker in the Clarity graph uses this address.</p><Link to="/biomarkers" go={go}>Return to biomarkers</Link></section></div>;

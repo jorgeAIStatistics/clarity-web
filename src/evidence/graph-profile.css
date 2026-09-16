@@ -85,3 +85,8 @@
 .gp-gap-list{margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
 .gp-gap-list>summary{cursor:pointer;font-size:14px;color:#b9d4e2;padding:6px 0;min-height:44px;display:flex;align-items:center}
 .gp-gap-list .ev-grid{margin-top:12px;opacity:.85}
+
+.gp-inline{margin-top:28px}
+.gp-inline>h2{margin-bottom:6px}
+.gp-inline .gp-kind:first-of-type{border-top:0;padding-top:8px}
+.gp-inline-ladder{display:flex;flex-wrap:wrap;gap:4px 24px;margin:14px 0 0;font-size:12px;color:var(--muted)}
