@@ -355,7 +355,8 @@ export function briefing({ result, matrix, intents = [], estimates = [], userRow
   else if (userRows.some(r => r.placeable)) add('user', `Your ${plural(userRows.filter(r => r.placeable).length, 'uploaded row')} can be placed on the landscape; choose the matching outcome to see ${userRows.filter(r => r.placeable).length === 1 ? 'it' : 'them'} beside the published estimates.`);
 
   const reviewed = estimates.filter(e => e.review === 'reviewed').length;
-  add('review', `${plural((result?.studies || []).length, 'record')} were retrieved for this question; ${reviewed ? `${reviewed} of ${estimates.length} estimates come from reviewed records and the rest are automated extractions` : 'every estimate here is an automated extraction that no expert has reviewed'}.`);
+  const retrieved = (result?.studies || []).length;
+  add('review', `${plural(retrieved, 'record')} ${retrieved === 1 ? 'was' : 'were'} retrieved for this question; ${reviewed ? `${reviewed} of ${estimates.length} estimates come from reviewed records and the rest are automated extractions` : 'every estimate here is an automated extraction that no expert has reviewed'}.`);
 
   return { version: BRIEFING_VERSION, sentences: limitRepeats(say, endpoint), basis: `Built from the ${plural((result?.studies || []).length, 'record')} retrieved for this question${userRows.length ? ' and your uploaded table' : ''}. Automated, provisional, and never pooled across studies.` };
 }
@@ -410,12 +411,23 @@ const overlapsQuestion = (rows, outcomes = []) => {
   return flatten(rows).some(f => [...words(`${f.target || ''} ${f.population || ''}`)].some(w => asked.has(w)));
 };
 
+// A condition, a drug or a treatment setting is context for a finding, not something measured.
+// Asking whether "measuring breast cancer" changes outcomes is nonsense, so those entities get one line.
+const CONTEXT_TYPES = ['condition', 'compound', 'intervention'];
+const isContext = (row, entity) => CONTEXT_TYPES.includes(row.type) || entity?.identity?.entity_class === 'Treatment setting';
+
 export function entityBriefs({ result, matrix, estimates = [] }) {
   const graphRows = (result?.graph_findings || []).map(f => ({ finding: f, quote: f.quote, pmid: f.pmid, title: f.title, layer: f.layer, study_id: f.study_id, entity_id: f.entity_id }));
   const asked = (result?.copilot?.question?.outcomes) || [];
   const named = (matrix?.rows || []).filter(r => r.primary && !r.temporary);
   return named.map(row => {
     const entity = (result?.entities || []).find(e => e.id === row.id) || { id: row.id, name: row.name };
+    if (isContext(row, entity)) {
+      const what = row.type === 'condition' ? 'the condition' : row.type === 'compound' || row.type === 'intervention' ? 'the treatment' : 'the setting';
+      return { id: row.id, name: row.name, path: row.path, source: 'context', context: true, findings: 0,
+        text: `${row.name} is ${what} your question names. Findings attach to the marker measured in that context, not to ${row.name} itself.`,
+        q4: [], q5: null, scope: null, inLibrary: [], missing: [] };
+    }
     const typed = graphRows.filter(f => f.entity_id === row.id);
     const rows = typed.length ? typed : estimateRows(estimates, row.id);
     const source = typed.length ? 'graph' : rows.length ? 'retrieved' : 'none';

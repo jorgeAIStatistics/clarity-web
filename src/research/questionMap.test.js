@@ -143,6 +143,8 @@ test('the briefing answers the asked intents, separates treatment trials from ut
   const matrix = coverageMatrix(briefFixture, DEMO.question), intents = detectIntents(DEMO.question);
   const estimates = publishedEstimates(briefFixture, {});
   const brief = briefing({ result: briefFixture, matrix, intents, estimates, questionFields: { population: ['adults without cardiovascular disease'], outcomes: ['cardiovascular events'] } });
+  assert.match(brief.sentences.at(-1).text, /3 records were retrieved/);
+  assert.match(briefing({ result: { ...briefFixture, studies: briefFixture.studies.slice(0, 1) }, matrix, intents, estimates, questionFields: {} }).sentences.at(-1).text, /1 record was retrieved/);
   assert.ok(brief.sentences.length >= 5 && brief.sentences.length <= 10, `sentences: ${brief.sentences.length}`);
   const kinds = brief.sentences.map(s => s.kind);
   for (const kind of ['question', 'association', 'prediction', 'utility_gap', 'guideline', 'gap', 'review']) assert.ok(kinds.includes(kind), `missing ${kind}`);
@@ -188,6 +190,21 @@ test('each mentioned entity gets the profile contract: Q4 by kind, Q5, and a lib
   assert.match(apob.q5, /No indexed evidence that measuring ApoB changes decisions or outcomes/);
   assert.ok(apob.inLibrary.includes('Clinical validation') && apob.inLibrary.includes('Incremental value'));
   assert.ok(apob.missing.includes('Clinical utility'));
+});
+
+test('a condition or setting is context, never something the reader is told to measure', () => {
+  const result = { ...briefFixture, entities: [...briefFixture.entities,
+    { id: 'condition:breast-cancer', name: 'breast cancer', entity_type: 'condition', matched_aliases: ['breast cancer'] },
+    { id: 'precision_context:radiotherapy', name: 'radiotherapy', entity_type: 'precision_context', matched_aliases: ['radiotherapy'], identity: { entity_class: 'Treatment setting' } }],
+    layer_coverage: { ...briefFixture.layer_coverage, entities: { ...briefFixture.layer_coverage.entities,
+      'condition:breast-cancer': { cells: cells({}), syntheses: 0 }, 'precision_context:radiotherapy': { cells: cells({}), syntheses: 0 } } } };
+  const briefs = entityBriefs({ result, matrix: coverageMatrix(result, 'ApoB and breast cancer after radiotherapy'), estimates: [] });
+  const condition = briefs.find(b => b.id === 'condition:breast-cancer');
+  assert.equal(condition.context, true);
+  assert.match(condition.text, /breast cancer is the condition your question names/);
+  assert.deepEqual([condition.q5, condition.q4.length, condition.inLibrary.length], [null, 0, 0]);
+  assert.match(briefs.find(b => b.id === 'precision_context:radiotherapy').text, /radiotherapy is the setting your question names/);
+  assert.equal(briefs.find(b => b.id === 'entity:apob').context, undefined);
 });
 
 test('typed graph findings win over retrieved estimates, and scope is stated only when the indication differs', () => {
