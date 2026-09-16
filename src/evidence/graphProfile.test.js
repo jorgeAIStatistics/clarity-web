@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches} from './graphProfile.js';
+import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,usageNotes,findingsCsv,findingsJson,EXPORT_COLUMNS} from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -54,4 +54,38 @@ test('the index search matches graph entities by name, alias or category and ran
   assert.deepEqual(graphMatches(rows, 'EGFR mutation').map(r => r.name), ['EGFR activating mutation']);
   assert.deepEqual(graphMatches(rows, 'variant').map(r => r.name), ['EGFR activating mutation']);
   assert.deepEqual(graphMatches(null, 'x'), []);
+});
+
+test('the page states what the object is and keeps gene, variant and protein apart', () => {
+  assert.equal(objectKind({ kind: 'Variant' }).label, 'Variant');
+  assert.match(objectKind({ kind: 'Variant' }).text, /does not carry to the gene as a whole/);
+  assert.match(objectKind({ type: 'gene' }).text, /not findings about one of its variants/);
+  assert.equal(objectKind({}).label, 'Entity');
+});
+
+test('permitted uses come from the finding kinds present, and utility is never assumed', () => {
+  const usage = usageNotes({ name: 'Chromogranin A', kind: 'Biomarker' }, [row(sens), row(auc)]);
+  assert.deepEqual(usage.may.map(u => u.kind), ['classification', 'discrimination']);
+  assert.equal(usage.mustNot[0].kind, 'utility');
+  assert.match(usage.mustNot[0].text, /Nothing indexed here shows that measuring Chromogranin A changes decisions/);
+  assert.ok(usage.mustNot.some(u => /cut-off to another assay/.test(u.text)));
+  const empty = usageNotes({ name: 'CA-125', kind: 'Biomarker' }, []);
+  assert.deepEqual([empty.empty, empty.may, empty.mustNot], [true, [], []]);
+  const variant = usageNotes({ name: 'EGFR activating mutation', kind: 'Variant' }, [row(hr)]);
+  assert.ok(variant.mustNot.some(u => u.kind === 'identity' && /whole gene/.test(u.text)));
+});
+
+test('findings export as one row per finding with quotes escaped', () => {
+  const entity = { id: 'biomarker:chromogranin-a', name: 'Chromogranin A' };
+  const csv = findingsCsv(entity, [row(sens), row(spec), row(sens)]);
+  const lines = csv.trim().split('\n');
+  assert.equal(lines[0], EXPORT_COLUMNS.join(','));
+  assert.equal(lines.length, 3);
+  assert.match(lines[1], /^biomarker:chromogranin-a,Chromogranin A,obs:1,classification,sensitivity,71,/);
+  // The passage holds a comma, so it must survive as one quoted CSV field.
+  assert.match(lines[1], /,"At a cut-off of 100 ng\/mL, CgA had a sensitivity of 71%\."$/);
+  assert.equal(findingsCsv({ id: 'x', name: 'He said "hi", loudly' }, []).trim().split('\n').length, 1);
+  const parsed = JSON.parse(findingsJson(entity, [row(sens)], [{ layer: 'observational', n_findings: 1 }]));
+  assert.equal(parsed.version, 'clarity-graph-findings-v1');
+  assert.deepEqual([parsed.entity.id, parsed.findings.length, parsed.layers[0].layer], ['biomarker:chromogranin-a', 1, 'observational']);
 });

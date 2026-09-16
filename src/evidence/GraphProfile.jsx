@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,groupFindings,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,LAYERS} from './graphProfile.js';
+import {layerLabel,groupFindings,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,usageNotes,findingsCsv,findingsJson,LAYERS} from './graphProfile.js';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -72,6 +72,12 @@ export default function GraphProfile({slug,go}){
 
   const {entity,layers,findings,related,studies,dead_letters:dead}=state.data;
   const groups=groupFindings(findings),total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
+  const object=objectKind(entity),usage=usageNotes(entity,findings);
+  const download=(text,type,extension)=>{
+    const url=URL.createObjectURL(new Blob([text],{type}));
+    const link=Object.assign(document.createElement('a'),{href:url,download:`${entity.id.replace(':','-')}-findings.${extension}`});
+    document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
   const aliases=entity.aliases.filter(a=>a!==entity.name);
   return <div className="gp">
     <Hero name={entity.name} go={go}>
@@ -84,6 +90,19 @@ export default function GraphProfile({slug,go}){
       </dl>
     </Hero>
 
+    <section className="gp-section" aria-labelledby="gp-what">
+      <div className="gp-section-head"><h2 id="gp-what">What this is, and what it can be used for</h2><p className="ev-note">Derived from the finding kinds actually indexed here, not from what the marker is known for elsewhere.</p></div>
+      <div className="gp-what">
+        <div><h3>{object.label}</h3><p>{object.text}</p></div>
+        <div><h3>You can use what is indexed to…</h3>{usage.empty
+          ? <p>Nothing yet: no typed finding is indexed for {entity.name}, so this page supports no claim about it.</p>
+          : <ul>{usage.may.map(u => <li key={u.kind}>{u.text}</li>)}</ul>}</div>
+        <div><h3>Not supported by this page</h3><ul>{usage.empty
+          ? <li>Absence here is absence of indexing, not evidence that {entity.name} is uninformative.</li>
+          : usage.mustNot.map(u => <li key={u.kind}>{u.text}</li>)}</ul></div>
+      </div>
+    </section>
+
     <section className="gp-section" aria-labelledby="gp-layers">
       <div className="gp-section-head"><h2 id="gp-layers">Evidence by layer</h2><p className="ev-note">A gap means no typed finding is indexed for that layer yet. It is a gap in Clarity's library, not evidence that none exist.</p></div>
       <ul className="gp-layers">{layers.map(l=><li key={l.layer} className="gp-layer" data-state={l.n_findings>0?'findings':'gap'}>
@@ -95,6 +114,9 @@ export default function GraphProfile({slug,go}){
     {groups.length>0&&<section className="gp-section" aria-labelledby="gp-findings">
       <div className="gp-section-head"><h2 id="gp-findings">Findings by kind</h2><p className="ev-note">Association, discrimination, classification and clinical utility answer different questions. None of them implies the next.</p></div>
       <AccuracyFigures table={table} strip={strip}/>
+      <p className="gp-export">{total>0
+        ? <>Take the findings with you: <button type="button" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button> <button type="button" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button> <span className="ev-note">One row per finding, with its passage, source and review state.</span></>
+        : null}</p>
       {groups.map(g=><div className="gp-kind" key={g.kind}>
         <h3>{g.label}<span>{g.rows.length}</span></h3><p className="ev-note">{g.note}</p>
         <ul className="gp-findings">{g.rows.map(f=><li key={f.id}>

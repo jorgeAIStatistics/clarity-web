@@ -44,3 +44,13 @@
 .gp-foot{margin-top:30px;border-top:1px solid var(--border);padding-top:16px}
 @media(max-width:900px){.gp-layers{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.gp-layers{grid-template-columns:1fr}.gp-identity{gap:0 24px}}
+
+.gp-what{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.gp-what>div{border:1px solid var(--border);border-radius:10px;padding:16px;background:#111722;min-width:0}
+.gp-what h3{margin:0 0 8px;font-size:13px;font-weight:550;letter-spacing:.02em;color:var(--accent)}
+.gp-what p{font-size:13.5px;color:#b7c4d8;margin:0;line-height:1.6}
+.gp-what ul{margin:0;padding-left:17px;display:grid;gap:7px;font-size:13.5px;color:#b7c4d8;line-height:1.6}
+.gp-export{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13.5px;color:#b7c4d8;margin:0 0 18px}
+.gp-export button{min-height:40px;padding:8px 14px}
+.gp-export .ev-note{flex-basis:100%;margin:0}
+@media(max-width:900px){.gp-what{grid-template-columns:1fr}}

@@ -105,3 +105,70 @@ export function graphMatches(rows,query=''){
   return (rows||[]).filter(e=>[e.name,e.category,...(e.aliases||[])].join(' ').toLowerCase().includes(q))
     .sort((a,b)=>(b.coverage.quantified_outcomes-a.coverage.quantified_outcomes)||a.name.localeCompare(b.name));
 }
+
+// ---- What the object is, and what its findings license --------------------
+const OBJECT_KINDS={
+  Biomarker:['Biomarker','A quantity measured in a sample or image. What it means depends on the assay, the units and the population it was measured in.'],
+  Gene:['Gene','A gene as a unit of sequence. Findings about a gene are not findings about one of its variants, and not about protein or RNA levels.'],
+  Variant:['Variant','A specific sequence change. Evidence for one variant does not carry to the gene as a whole, or to another variant in it.'],
+  Protein:['Protein','A protein product. Protein level, transcript level and gene status are different measurements and are not interchangeable.'],
+  Test:['Test','A test or procedure as it is performed, including its threshold and reference standard.'],
+  Assay:['Assay','A specific measurement method. Values from different assays are often not comparable without calibration.'],
+  PrecisionContext:['Precision context','A marker, a treatment and a condition considered together; evidence here belongs to that combination, not to any part alone.'],
+  Condition:['Condition','A disease or state that findings are reported for.'],
+  Metabolite:['Metabolite','A small molecule measured in a sample.'],
+  Pathway:['Pathway','A set of interacting molecules; pathway membership is not evidence about any single member.'],
+};
+export function objectKind(entity={}){
+  const [label,text]=OBJECT_KINDS[entity.kind]||OBJECT_KINDS[{biomarker:'Biomarker',gene:'Gene',variant:'Variant',protein:'Protein',test:'Test',assay:'Assay',precision_context:'PrecisionContext',condition:'Condition',metabolite:'Metabolite',pathway:'Pathway'}[entity.type]]||['Entity','An entity in the evidence graph.'];
+  return {label,text};
+}
+const MAY={
+  classification:'Compare its reported accuracy at the stated cut-off, assay and reference standard against another test studied the same way.',
+  discrimination:'Compare how well models using it rank people, on the study’s own cohort and outcome.',
+  prognosis:'Describe how it relates to a later course such as survival or progression, in the population studied.',
+  association:'Describe how it varies with a condition or another measurement, in the population studied.',
+  effect:'Read a between-group comparison with its interval, for the contrast the study actually made.',
+  utility:'Point to evidence that using it changed a decision or an outcome — the only kind here that speaks to clinical value.',
+  guideline:'Quote what a named guideline or consensus statement says, with its date and scope.',
+};
+const MUST_NOT={
+  classification:'Do not carry a cut-off to another assay, sample type or population; accuracy is not evidence that testing improves outcomes.',
+  discrimination:'Do not read a higher AUC or C-index as better care: discrimination is not calibration and not a decision.',
+  prognosis:'Do not read a prognostic association as a prediction of who benefits from treatment; that needs a treatment-by-marker interaction.',
+  association:'Do not read association as causation, or as evidence that changing the marker changes the outcome.',
+  effect:'Do not transfer an effect measured in one contrast, dose or population to another.',
+  guideline:'Do not treat a quoted recommendation as current: check the guideline’s own date and scope.',
+};
+const IDENTITY_LIMITS={
+  Gene:'Do not mix gene-level findings with findings about a specific variant, or with protein or expression levels.',
+  Variant:'Do not generalize this variant to the whole gene, or to other variants in it.',
+  Protein:'Do not read protein-level findings as gene or transcript findings.',
+};
+
+// Uses are derived only from the finding kinds actually indexed; with no findings, nothing is licensed.
+export function usageNotes(entity={},rows=[]){
+  const kinds=[...new Set(flatten(rows).map(f=>f.kind).filter(Boolean))];
+  const order=k=>KINDS.indexOf(k);
+  const present=kinds.filter(k=>MAY[k]).sort((a,b)=>order(a)-order(b));
+  const may=present.map(k=>({kind:k,text:MAY[k]}));
+  const mustNot=present.filter(k=>MUST_NOT[k]).map(k=>({kind:k,text:MUST_NOT[k]}));
+  if(present.length&&!present.includes('utility'))mustNot.unshift({kind:'utility',text:`Nothing indexed here shows that measuring ${entity.name||'this marker'} changes decisions or outcomes; no clinical-utility finding is recorded.`});
+  const identity=IDENTITY_LIMITS[entity.kind];
+  if(identity)mustNot.push({kind:'identity',text:identity});
+  return {may,mustNot,empty:!present.length};
+}
+
+// ---- Export ---------------------------------------------------------------
+export const EXPORT_COLUMNS=['entity_id','entity_name','finding_id','kind','measure','estimate','lower','upper','interval_level','unit','cutoff','cutoff_unit','assay','target','population','setting','comparator','p_value','p_operator','layer','review_state','pmid','year','title','quote'];
+const csvCell=v=>{const t=v==null?'':String(v);return /[",\n]/.test(t)?`"${t.replaceAll('"','""')}"`:t;};
+export function findingsCsv(entity={},rows=[]){
+  const lines=[EXPORT_COLUMNS.join(',')];
+  for(const f of flatten(rows)){
+    lines.push([entity.id,entity.name,f.id,f.kind,f.measure,f.estimate,f.lower,f.upper,f.level,f.unit,f.cutoff,f.cutoff_unit,f.assay,f.target,f.population,f.setting,f.comparator,f.p_value,f.p_operator,f.layer,f.review_state,f.pmid,f.year,f.title,f.quote].map(csvCell).join(','));
+  }
+  return lines.join('\n')+'\n';
+}
+export function findingsJson(entity={},rows=[],layers=[]){
+  return JSON.stringify({version:'clarity-graph-findings-v1',exported_at:new Date().toISOString(),entity,layers,findings:flatten(rows)},null,2);
+}
