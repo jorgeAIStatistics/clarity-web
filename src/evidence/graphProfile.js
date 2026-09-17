@@ -353,6 +353,19 @@ export function freshness(data){
            :'The live evidence graph did not answer, so this page is the last published copy.';
 }
 
+// When a profile will not load, "try again in a minute" is a guess. These two endpoints turn it
+// into an answer: /api/health says whether the engine is up at all, and the graph stats endpoint is
+// the cheapest read that proves the graph itself is reachable. A reader who is told which of the
+// two is down knows whether waiting will help.
+export async function diagnose(request,base=''){
+  const reachable=async path=>{try{const response=await request(`${base}${path}`);return Boolean(response&&response.ok);}catch{return false;}};
+  if(!await reachable('/api/health'))
+    return {engine:false,graph:false,text:'The evidence engine is not answering yet. It restarts on every deploy and usually comes back within a minute.'};
+  if(!await reachable('/api/evidence/graph/stats'))
+    return {engine:true,graph:false,text:'The engine is running, but the evidence graph behind it is not answering, so no profile can be read right now. Pages with a published copy are still being served from it.'};
+  return {engine:true,graph:true,text:'The engine and the evidence graph are both answering, so this page failed for some other reason. Trying again usually works.'};
+}
+
 export const RETRY_DELAYS=[1500,4000];
 export function shouldRetry(outcome){
   if(outcome==='network')return true;
@@ -393,7 +406,7 @@ export function idCaption(entity={}){
   const kind=entity.kind||entity.type;
   if(kind==='Variant'||kind==='variant')return 'These identify the gene and protein this variant alters. The variant itself is a separate object.';
   if(kind==='PrecisionContext'||kind==='precision_context')return 'These identify the gene at the centre of this marker-and-treatment pair.';
-  if(kind==='Gene'||kind==='gene')return 'Gene identifiers. The protein and any variant of it are separate objects here.';
+  if(kind==='Gene'||kind==='gene')return 'The gene, and the protein it encodes. That protein and any variant of this gene are separate objects here, with their own pages and their own findings.';
   return 'These identify the gene that encodes it and the protein that is measured.';
 }
 

@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,freshness,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,kindBadge,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
 import './graph-profile.css';
 
@@ -115,13 +115,24 @@ export function GraphFindings({slug,type='biomarker'}){
   </section>;
 }
 
+// After the retries are spent, say which layer is down instead of guessing at a wait.
+function Diagnosis(){
+  const [said,setSaid]=useState('Checking whether the engine or the evidence graph is down…');
+  useEffect(()=>{
+    let active=true;
+    diagnose(url=>fetch(url),API_BASE).then(r=>{if(active)setSaid(r.text);}).catch(()=>{});
+    return()=>{active=false;};
+  },[]);
+  return <p role="status">{said}</p>;
+}
+
 export default function GraphProfile({slug,go,type='biomarker'}){
   const [attempt,setAttempt]=useState(0);
   const state=useGraphEntity(slug,type,attempt);
 
   if(state.status==='loading'||state.status==='retrying')return <div className="gp" aria-busy="true"><div className="ev-hero"><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><div className="gp-skeleton gp-skeleton-title"/><div className="gp-skeleton"/></div><ul className="gp-layers" aria-hidden="true">{LAYERS.map(l=><li key={l} className="gp-layer gp-layer-skeleton"/>)}</ul><p className="ev-note" role="status">{state.status==='retrying'?'The evidence engine is waking up. Retrying…':'Loading the graph profile…'}</p></div>;
   if(state.status==='missing')return <div className="gp"><Hero name="Page not found" go={go} type={type}/><section className="ev-panel"><h2>This evidence page does not exist</h2><p>No biomarker in the Clarity graph uses this address.</p><Link to="/biomarkers" go={go}>Return to biomarkers</Link></section></div>;
-  if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><p>The evidence engine may be starting up. Try again in a minute.</p><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
+  if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><Diagnosis/><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
 
   const {entity,layers,findings,related,studies,dead_letters:dead}=state.data;
   const stale=freshness(state.data);

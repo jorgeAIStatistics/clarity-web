@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness } from './graphProfile.js';
+import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose } from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -242,7 +242,10 @@ test('identifiers link to the registry that issued them, and the caption says wh
   assert.equal(externalLinks({ external_ids: { mondo: 'MONDO:0007254' } })[0].url, 'https://www.ebi.ac.uk/ols4/ontologies/mondo/classes?short_form=MONDO_0007254');
   // A variant's identifiers belong to the gene it alters; the page must not imply otherwise.
   assert.match(idCaption({ kind: 'Variant' }), /gene and protein this variant alters/);
-  assert.match(idCaption({ kind: 'Gene' }), /protein and any variant of it are separate/);
+  // A gene page shows a UniProt accession, which identifies the protein, not the gene: the caption
+  // has to say so, or the same three ids would read as one object across three different pages.
+  assert.match(idCaption({ kind: 'Gene' }), /the protein it encodes/);
+  assert.match(idCaption({ kind: 'Gene' }), /separate objects/);
   assert.match(idCaption({ kind: 'Biomarker' }), /gene that encodes it and the protein that is measured/);
 });
 
@@ -278,4 +281,26 @@ test('the catalog leads with what can answer something, and search reaches the r
   assert.deepEqual(graphMatches(rows, '').map(r => r.name), ['CA-125', 'IL-18', 'Zonulin'], 'typed findings first');
   assert.deepEqual(graphMatches(rows, 'muc16').map(r => r.name), ['CA-125'], 'an alias finds the page');
   assert.deepEqual(graphMatches(rows, 'zonulin').map(r => r.name), ['Zonulin'], 'a page with nothing indexed is still findable');
+});
+
+test('a failed profile says which layer is down, instead of guessing at a wait', async () => {
+  const asked = [];
+  const answer = up => async url => { asked.push(url); return { ok: up(url) }; };
+  const dead = await diagnose(answer(() => false), 'https://api.example');
+  assert.deepEqual([dead.engine, dead.graph], [false, false]);
+  assert.match(dead.text, /engine is not answering yet/);
+  assert.deepEqual(asked, ['https://api.example/api/health'], 'a dead engine is not asked a second question');
+
+  asked.length = 0;
+  const graphDown = await diagnose(answer(url => url.endsWith('/api/health')), 'https://api.example');
+  assert.deepEqual([graphDown.engine, graphDown.graph], [true, false]);
+  assert.match(graphDown.text, /evidence graph behind it is not answering/);
+  assert.deepEqual(asked, ['https://api.example/api/health', 'https://api.example/api/evidence/graph/stats']);
+
+  const both = await diagnose(answer(() => true), '');
+  assert.deepEqual([both.engine, both.graph], [true, true]);
+  assert.match(both.text, /failed for some other reason/);
+  // A probe that throws is a failure, not an exception the page has to survive.
+  const thrown = await diagnose(async () => { throw new TypeError('Failed to fetch'); }, '');
+  assert.equal(thrown.engine, false);
 });
