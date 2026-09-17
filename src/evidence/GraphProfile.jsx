@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
 import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,freshness,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,kindBadge,LAYERS} from './graphProfile.js';
+import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -200,7 +201,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
         {g.kind==='discrimination'&&<AccuracyFigures table={EMPTY_TABLE} strip={strip}/>}
         <FindingList rows={g.rows}/>
       </div>)}
-      {total>0&&<p className="gp-export">Take the findings with you: <button type="button" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button> <button type="button" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button> <span className="ev-note">One row per finding, with its passage, source and review state.</span></p>}
+      {total>0&&<p className="gp-export">The whole profile as one file: <button type="button" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button> <button type="button" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button> <span className="ev-note">One row per finding, with its passage, source and review state. The workspace below takes a filtered selection instead.</span></p>}
     </section>
 
     <section className="gp-q" aria-labelledby="gp-q5">
@@ -213,6 +214,12 @@ export default function GraphProfile({slug,go,type='biomarker'}){
       <ul>{dead.map(d=><li key={`${d.pmid}-${d.at}`}>{d.pmid?`PMID ${d.pmid}`:'Source'}: {deadLetterText(d)}.</li>)}</ul>
       <p className="ev-note">Recorded so the next extraction pass knows why. A rejected passage is not evidence against {entity.name}.</p>
     </details>}
+
+    {total>0&&<FindingsWorkspace
+      result={{entities:[{id:entity.id,name:entity.name}],graph_findings:flatten(findings).map(f=>({...f,entity_id:entity.id}))}}
+      estimates={[]} letter="F" title={`Every ${entity.name} finding in one table`} context="profile" subject={entity.name}
+      briefs={[{name:entity.name,missing:rungs.filter(r=>!r.indexed).map(r=>r.label)}]}
+      intro="Filter this profile's findings by kind, layer or measure, take the rows you need, and copy a methods sentence that states what this library did and did not hold."/>}
 
     <p className="ev-note gp-foot">Automated graph profile built from published abstracts, with curated identity text marked as background. It describes what studies report and is not a clinical decision or individual risk tool.</p>
   </div>;

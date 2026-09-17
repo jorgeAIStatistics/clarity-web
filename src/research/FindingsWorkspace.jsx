@@ -13,7 +13,9 @@ function download(text, mime, extension) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function FindingsWorkspace({ result, estimates, briefs = [], restatement = '', question = '' }) {
+export default function FindingsWorkspace({ result, estimates, briefs = [], restatement = '', question = '',
+                                            letter = 'W', title = 'Findings workspace', context = 'question', subject = '',
+                                            intro = 'Every finding behind this map in one table: filter it, take the rows you need, and copy a methods sentence that states what was and was not in the library.' }) {
   const rows = useMemo(() => workspaceRows({ result, estimates }), [result, estimates]);
   const options = useMemo(() => facets(rows), [rows]);
   const [filters, setFilters] = useState({ kinds: [], layers: [], entities: [], sources: [], text: '' });
@@ -31,7 +33,7 @@ export default function FindingsWorkspace({ result, estimates, briefs = [], rest
     filters.sources.length && `source ${filters.sources.map(s => SOURCES[s] || s).join(' or ')}`,
     filters.text.trim() && `text “${filters.text.trim()}”`,
   ].filter(Boolean).join(', ');
-  const meta = { question, rows_shown: shown.length, rows_in_question: rows.length, filtered_by: described || null };
+  const meta = { question, subject: subject || null, rows_shown: shown.length, rows_in_question: rows.length, filtered_by: described || null };
   const announce = message => { setSaid(message); setTimeout(() => setSaid(''), 4000); };
   const copy = (text, message) => {
     navigator.clipboard?.writeText(text).then(() => announce(message)).catch(() => announce('Copying was blocked; use a download instead.'));
@@ -42,8 +44,8 @@ export default function FindingsWorkspace({ result, estimates, briefs = [], rest
   });
 
   return <section className="qm-panel qm-workspace-panel" aria-labelledby="qm-workspace">
-    <div className="qm-panel-head"><span className="qm-letter" aria-hidden="true">W</span><h2 id="qm-workspace">Findings workspace</h2></div>
-    <p className="qm-sub">Every finding behind this map in one table: filter it, take the rows you need, and copy a methods sentence that states what was and was not in the library.</p>
+    <div className="qm-panel-head"><span className="qm-letter" aria-hidden="true">{letter}</span><h2 id="qm-workspace">{title}</h2></div>
+    <p className="qm-sub">{intro}</p>
 
     <div className="qm-facets">
       <label className="qm-search-field">Search these findings
@@ -67,7 +69,7 @@ export default function FindingsWorkspace({ result, estimates, briefs = [], rest
         <button type="button" className="qm-button" onClick={() => copy(toTsv(taken), `${taken.length} rows copied as a table.`)}>Copy table</button>
         <button type="button" className="qm-button" onClick={() => download(toCsv(taken), 'text/csv', 'csv')}>Download CSV</button>
         <button type="button" className="qm-button" onClick={() => download(toJson(taken, meta), 'application/json', 'json')}>Download JSON</button>
-        <button type="button" className="qm-button" onClick={() => copy(methodsSnippet({ question, restatement, rows: taken, briefs, result, filters: described || null }), 'Methods sentence copied.')}>Copy methods snippet</button>
+        <button type="button" className="qm-button" onClick={() => copy(methodsSnippet({ question, restatement, rows: taken, briefs, result, filters: described || null, context, subject }), 'Methods sentence copied.')}>Copy methods snippet</button>
         {selected.length > 0 && <button type="button" className="qm-button qm-ghost" onClick={() => setSelected([])}>Clear selection</button>}
       </div>
       <p className="qm-sr" aria-live="polite">{said}</p>

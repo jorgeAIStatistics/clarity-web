@@ -66,7 +66,7 @@ export function toJson(rows, meta = {}) {
 
 // A paragraph a researcher can paste into their methods, stating the boundary of the search as
 // well as its result. Absence is reported as absence of indexing, never as absence of evidence.
-export function methodsSnippet({ question = '', restatement = '', rows = [], briefs = [], result = null, filters = null } = {}) {
+export function methodsSnippet({ question = '', restatement = '', rows = [], briefs = [], result = null, filters = null, context = 'question', subject = '' } = {}) {
   const typed = rows.filter(r => r.source === 'graph');
   const retrieved = rows.filter(r => r.source === 'retrieved');
   const byKind = [...new Set(typed.map(r => r.kind))].sort().map(kind => `${typed.filter(r => r.kind === kind).length} ${kind}`);
@@ -75,9 +75,14 @@ export function methodsSnippet({ question = '', restatement = '', rows = [], bri
   const entities = named.map(b => b.name).join(', ') || 'no entity was resolved';
   const asked = restatement || question.trim().slice(0, 300);
   const when = new Date().toISOString().slice(0, 10);
+  const named_subject = subject || entities;
   const lines = [
-    `Question as parsed: ${asked}`,
-    `Entities resolved from the question text: ${entities}. Only entities named in the question are linked; related markers are never added.`,
+    context === 'profile'
+      ? `Source: the Clarity evidence-graph profile for ${named_subject}, read on ${when}.`
+      : `Question as parsed: ${asked}`,
+    context === 'profile'
+      ? `A finding is attached to ${named_subject} only when that name is written in the passage it came from; related markers are never added.`
+      : `Entities resolved from the question text: ${entities}. Only entities named in the question are linked; related markers are never added.`,
     typed.length
       ? `In this library: ${typed.length} typed finding${typed.length === 1 ? '' : 's'} (${byKind.join(', ')}), each bound to a quoted source passage.`
       : 'In this library: no typed finding is indexed for these entities.',
