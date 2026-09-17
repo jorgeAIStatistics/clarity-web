@@ -103,6 +103,12 @@ const REJECTIONS={
   rejected_other:'rejected by validation',
 };
 export function deadLetterText(d){
+  // When a paper reported numbers about something else, name that something: "findings about other
+  // markers" is unreadable, and on a test page the other marker is often the analyte the test
+  // measures, which a reader can only judge if they can see the two names side by side.
+  const others=(d.excluded||[]).filter(Boolean);
+  if(d.code==='findings_about_other_markers'&&others.length)
+    return `it reported numbers about ${listWords(others.map(m=>m.length>60?m.slice(0,57)+'…':m))}, and no passage named this page's subject, so nothing was attached`;
   const reasons=Object.entries(d.reasons||{}).filter(([,n])=>n>0);
   if(!reasons.length)return 'no typed finding passed validation';
   return reasons.map(([k,n])=>`${REJECTIONS[k]||k.replaceAll('_',' ')}${n>1?` (${n}×)`:''}`).join('; ');

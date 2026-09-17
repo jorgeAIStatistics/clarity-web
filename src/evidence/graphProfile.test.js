@@ -319,3 +319,17 @@ test('a population that names no one in particular is not reported as a scope', 
   assert.match(mixed, /currently from women with an adnexal mass/);
   assert.equal(scopeNote({ name: 'X' }, []), null);
 });
+
+test('a rejected paper is described by what it did measure', () => {
+  // "findings about other markers" told the reader nothing, and on a test page the other marker is
+  // often the analyte the test measures — which only reads correctly if both names are shown.
+  const other = deadLetterText({ code: 'findings_about_other_markers', reasons: { findings_about_other_markers: 2 },
+                                 excluded: ['BRCA2 loss', 'microsatellite instability-high status'] });
+  assert.match(other, /it reported numbers about BRCA2 loss and microsatellite instability-high status/);
+  assert.match(other, /no passage named this page's subject/);
+  // Without the marker names there is nothing better to say than the code.
+  assert.match(deadLetterText({ code: 'findings_about_other_markers', reasons: { findings_about_other_markers: 1 }, excluded: [] }),
+               /findings about other markers/);
+  assert.match(deadLetterText({ reasons: { rejected_numeric_token: 3 } }), /number could not be read exactly from the source \(3×\)/);
+  assert.equal(deadLetterText({ reasons: {} }), 'no typed finding passed validation');
+});
