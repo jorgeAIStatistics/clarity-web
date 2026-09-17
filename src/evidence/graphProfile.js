@@ -333,11 +333,17 @@ export function ladder(entity={},rows=[]){
 }
 
 // What the indexed evidence is actually about, so a reader does not take it for the general case.
+// A population that names no one in particular — "patients", "adults", "participants" — narrows
+// nothing, and a sentence built on it ("Indexed evidence is currently from patients") claims a
+// scope the findings do not have. Those read as no stated population at all.
+const VAGUE=/^(?:the\s+)?(?:patients?|adults?|participants?|subjects?|individuals?|people|persons?|cases?|humans?|men|women|children|controls?)$/i;
+const statesAPopulation=text=>Boolean(String(text||'').trim())&&!VAGUE.test(String(text).trim());
+
 export function scopeNote(entity={},rows=[]){
   const list=flatten(rows);
   if(!list.length)return null;
-  const where=uniq(list.map(f=>f.population||f.setting)).slice(0,3);
-  if(!where.length)return `Indexed findings do not state the population they came from, so their scope is unknown.`;
+  const where=uniq(list.map(f=>f.population||f.setting).filter(statesAPopulation)).slice(0,3);
+  if(!where.length)return `Indexed findings do not state which population they came from, so their scope is unknown.`;
   return `Indexed evidence is currently from ${listWords(where)}. Other uses of ${entity.name} are not indexed here, and absence is not evidence against them.`;
 }
 

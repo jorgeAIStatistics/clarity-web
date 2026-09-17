@@ -304,3 +304,18 @@ test('a failed profile says which layer is down, instead of guessing at a wait',
   const thrown = await diagnose(async () => { throw new TypeError('Failed to fetch'); }, '');
   assert.equal(thrown.engine, false);
 });
+
+test('a population that names no one in particular is not reported as a scope', () => {
+  const row = (population, id) => ({ finding: { id, kind: 'association', measure: 'hazard_ratio', estimate: 1.2, population }, quote: 'q' });
+  // "Indexed evidence is currently from patients" claims a narrowing that the findings do not make.
+  const vague = scopeNote({ name: 'ApoB' }, [row('patients', 'a'), row('adults', 'b')]);
+  assert.match(vague, /do not state which population/);
+  assert.doesNotMatch(vague, /currently from/);
+  const real = scopeNote({ name: 'IL-18' }, [row('biologic-naive patients with SD', 'c')]);
+  assert.match(real, /currently from biologic-naive patients with SD/);
+  assert.match(real, /absence is not evidence against them/);
+  // A real population among vague ones is still the scope worth reporting.
+  const mixed = scopeNote({ name: 'IL-18' }, [row('adults', 'd'), row('women with an adnexal mass', 'e')]);
+  assert.match(mixed, /currently from women with an adnexal mass/);
+  assert.equal(scopeNote({ name: 'X' }, []), null);
+});
