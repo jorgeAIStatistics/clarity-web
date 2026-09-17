@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,kindBadge,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,freshness,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,kindBadge,LAYERS} from './graphProfile.js';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -123,6 +123,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
   if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><p>The evidence engine may be starting up. Try again in a minute.</p><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
 
   const {entity,layers,findings,related,studies,dead_letters:dead}=state.data;
+  const stale=freshness(state.data);
   const total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
   const q1=identity(entity,related),q2=biology(entity,findings),q3=measurement(entity,findings),q4=meaning(entity,findings),q5=utility(entity,findings);
   const rungs=ladder(entity,findings),scope=scopeNote(entity,findings),ask=questions(type),links=externalLinks(entity);
@@ -133,6 +134,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
   };
   return <div className="gp">
     <Hero name={entity.name} go={go} type={type}>
+      {stale&&<p className="gp-stale" role="status">{stale}</p>}
       <p className="ev-intro">{q1.text}{q1.specimen?` Measured in ${q1.specimen.toLowerCase()}.`:''} This page answers five questions in order, from what the object is to whether measuring it helps, using only findings indexed in the graph.</p>
       <dl className="gp-identity">
         {q1.aliases.length>0&&<div><dt>Also written as</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
@@ -217,15 +219,28 @@ export default function GraphProfile({slug,go,type='biomarker'}){
 }
 
 // Graph biomarkers from /api/library that the bundled catalog does not profile, as browsable cards.
+// The index's whole shelf hangs on this one request: when it failed the page silently showed only
+// the curated profiles, which reads as "the library is small" rather than "a request failed". It
+// retries on the statuses a restarting engine returns, and says plainly when it has given up.
 export function useGraphBiomarkers(enabled=true){
-  const [state,setState]=useState({rows:null,failed:false});
+  const [state,setState]=useState({rows:null,failed:false,waking:false});
   useEffect(()=>{
     if(!enabled)return undefined;
-    let active=true;
-    fetch(`${API_BASE}/api/library`).then(r=>{if(!r.ok)throw Error();return r.json();})
-      .then(d=>{if(active)setState({rows:(d.entries||[]).filter(e=>String(e.id).startsWith('graph:')),failed:false});})
-      .catch(()=>{if(active)setState({rows:null,failed:true});});
-    return()=>{active=false;};
+    let active=true,waiting=null;
+    const once=async()=>{
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+      try{
+        const response=await fetch(`${API_BASE}/api/library`,{signal:controller.signal});
+        if(!response.ok)throw Object.assign(Error('request_failed'),{outcome:response.status});
+        return response.json();
+      }finally{clearTimeout(timer);}
+    };
+    fetchWithRetry(once,{
+      sleep:ms=>new Promise(resolve=>{waiting=setTimeout(resolve,ms);}),
+      onRetry:()=>{if(active)setState(s=>({...s,waking:true}));},
+    }).then(d=>{if(active)setState({rows:(d.entries||[]).filter(e=>String(e.id).startsWith('graph:')),failed:false,waking:false});})
+      .catch(()=>{if(active)setState({rows:null,failed:true,waking:false});});
+    return()=>{active=false;clearTimeout(waiting);};
   },[enabled]);
   return state;
 }
@@ -246,11 +261,12 @@ function Card({entity,go}){
 export function GraphBiomarkerList({go,query='',rows=undefined,failed=false,label='From the evidence graph'}){
   const fetched=useGraphBiomarkers(rows===undefined);
   const all=rows===undefined?fetched.rows:rows, missing=rows===undefined?fetched.failed:failed;
+  const waking=rows===undefined&&fetched.waking&&!all;
   const shown=graphMatches(all,query);
   // Pages that can answer something lead; names with nothing indexed stay searchable behind a fold.
   const withFindings=shown.filter(e=>e.coverage.quantified_outcomes>0),gaps=shown.filter(e=>!e.coverage.quantified_outcomes);
   return <section className="ev-browser" aria-labelledby="gp-graph-list">
-    <div className="ev-library-title"><h2 id="gp-graph-list">{label}{all?` (${all.length})`:''}</h2><span role="status">{missing?'The evidence graph list could not be loaded.':all?`${withFindings.length} with typed findings · ${gaps.length} not yet`:'Loading…'}</span></div>
+    <div className="ev-library-title"><h2 id="gp-graph-list">{label}{all?` (${all.length})`:''}</h2><span role="status">{missing?'These profiles could not be loaded, so this count is short. The engine may be restarting.':all?`${withFindings.length} with typed findings · ${gaps.length} not yet`:waking?'The evidence engine is waking up. Retrying…':'Loading…'}</span></div>
     <p className="ev-note">Automated graph profiles: aliases, five evidence layers and typed findings with source passages. GAP means no typed finding is indexed yet, not that none exist.</p>
     {all&&<>
       {withFindings.length>0&&<div className="ev-grid">{withFindings.map(e=><Card key={e.id} entity={e} go={go}/>)}</div>}

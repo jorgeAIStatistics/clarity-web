@@ -204,7 +204,7 @@ export default function QuestionMap() {
   const busy = ['resolving', 'mapping'].includes(status.phase);
   const matrix = useMemo(() => (result ? coverageMatrix(result, submitted) : null), [result, submitted]);
   const estimates = useMemo(() => (result ? publishedEstimates(result, snapshot) : []), [result, snapshot]);
-  const intents = useMemo(() => detectIntents(submitted, result?.copilot?.question?.focus, edits?.intents || (result?.intent ? result.intent.intents.map(x => ({ clinical_utility: 'utility' }[x] || x)) : null)), [submitted, result, edits]);
+  const intents = useMemo(() => detectIntents(submitted, result?.copilot?.question?.focus, edits?.intents || null, result?.intent ? result.intent.intents.map(x => ({ clinical_utility: 'utility' }[x] || x)) : null), [submitted, result, edits]);
   const questionFields = useMemo(() => ({ population: edits?.population ? [edits.population] : result?.copilot?.question?.population || [], outcomes: edits?.outcome ? [edits.outcome] : result?.copilot?.question?.outcomes || [] }), [edits, result]);
   const options = useMemo(() => outcomeOptions(estimates, userRows, questionFields.outcomes), [estimates, userRows, questionFields]);
   const current = options.some(o => o.name === outcome) ? outcome : options[0]?.name || '';

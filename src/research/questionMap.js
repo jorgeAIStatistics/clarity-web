@@ -22,9 +22,19 @@ export const INTENTS = [
   { key: 'enrichment', label: 'Trial enrichment', layer: 'interventional', question: 'Can it select who enters a trial?', answeredBy: 'trials or trial analyses that select or stratify by the marker', pattern: /enrich|stratif\w* (?:trial|enrol)|trial selection/i },
 ];
 const FOCUS = { association: ['association'], prediction: ['incremental'], utility: ['utility', 'treatment'], guideline: ['guidelines'], mechanism: [], enrichment: [] };
-export function detectIntents(text, focus = [], chosen = null) {
+// `chosen` is the researcher's own edit and stands alone. `parsed` is what the engine's parser read
+// out of the question, and it is a second reading of the same text, not a replacement for it: either
+// naming an intent is enough. Letting the parse win outright put "Prediction · not asked" directly
+// above a briefing paragraph about C-index gains whenever the parser dropped an intent the question
+// plainly asks for, and the chips and the briefing must not contradict each other.
+export function detectIntents(text, focus = [], chosen = null, parsed = null) {
   const ids = new Set(focus.map(f => f.id));
-  return INTENTS.map(i => ({ ...i, asked: chosen ? chosen.includes(i.key) : i.pattern.test(text || '') || FOCUS[i.key].some(id => ids.has(id)) }));
+  const named = new Set(parsed || []);
+  return INTENTS.map(i => ({
+    ...i,
+    asked: chosen ? chosen.includes(i.key)
+      : named.has(i.key) || i.pattern.test(text || '') || FOCUS[i.key].some(id => ids.has(id)),
+  }));
 }
 
 export function directionLabel(d = {}) {

@@ -98,3 +98,9 @@
 .gp-ids .ev-note{margin:0;max-width:78ch}
 
 .gp-card-gap{color:#d8c48a}
+
+/* A page served from the published snapshot says so, in the tone of a note rather than an alarm:
+   the content is real, only its freshness is in question. */
+.gp-stale{margin:0 0 .9rem;padding:.55rem .75rem;border-left:2px solid var(--gp-accent,#34e0be);
+  background:color-mix(in srgb,var(--gp-accent,#34e0be) 7%,transparent);border-radius:0 4px 4px 0;
+  font-size:.82rem;line-height:1.45;color:var(--ev-text-muted,#9aa4b2);max-width:60ch;}

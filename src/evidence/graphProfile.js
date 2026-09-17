@@ -344,6 +344,15 @@ export function scopeNote(entity={},rows=[]){
 // ---- Retry policy ---------------------------------------------------------
 // The engine restarts on every deploy and answers 502/503, or nothing at all, for a few seconds.
 // A page loaded in that window should recover by itself. A 404 is an answer, not a failure.
+// A page served from the published snapshot is readable but may be behind the graph, so it says
+// when it was published rather than letting a stale copy pass for a live read.
+export function freshness(data){
+  if(data?.served_from!=='snapshot')return null;
+  const at=String(data.published_at||'').slice(0,10);
+  return at?`Published ${at}. The live evidence graph did not answer, so this page is the last published copy; a finding added since then is not shown.`
+           :'The live evidence graph did not answer, so this page is the last published copy.';
+}
+
 export const RETRY_DELAYS=[1500,4000];
 export function shouldRetry(outcome){
   if(outcome==='network')return true;

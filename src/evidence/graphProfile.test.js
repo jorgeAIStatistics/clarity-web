@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {valueText,flatten,groupFindings,aucStrip,classificationRows,relationLabel,deadLetterText,graphMatches,objectKind,findingsCsv,findingsJson,graphPrefixes,routeTypes,EXPORT_COLUMNS,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,shouldRetry,RETRY_DELAYS,fetchWithRetry,externalLinks,idCaption,kindBadge} from './graphProfile.js';
+import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness } from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -255,4 +255,27 @@ test('a library card says which kinds it holds and whether utility is among them
   assert.equal(many.utility, true);
   assert.equal(kindBadge({ coverage: { quantified_outcomes: 0 } }).text, 'Not in this library yet');
   assert.deepEqual(kindBadge({}).kinds, []);
+});
+
+test('a page served from the published snapshot says when it was published', () => {
+  const live = freshness({ served_from: 'graph', findings: [] });
+  assert.equal(live, null, 'a live read needs no caveat');
+  const stale = freshness({ served_from: 'snapshot', published_at: '2026-09-17T15:38:54Z' });
+  assert.match(stale, /Published 2026-09-17/);
+  assert.match(stale, /did not answer/);
+  assert.match(stale, /a finding added since then is not shown/);
+  // An older engine that does not send the field is treated as live, not as stale.
+  assert.equal(freshness({ findings: [] }), null);
+  assert.match(freshness({ served_from: 'snapshot' }), /last published copy/);
+});
+
+test('the catalog leads with what can answer something, and search reaches the rest', () => {
+  const rows = [
+    { name: 'Zonulin', aliases: [], category: 'Molecular marker', coverage: { quantified_outcomes: 0 } },
+    { name: 'CA-125', aliases: ['MUC16'], category: 'Molecular marker', coverage: { quantified_outcomes: 7 } },
+    { name: 'IL-18', aliases: ['Interleukin-18'], category: 'Molecular marker', coverage: { quantified_outcomes: 6 } },
+  ];
+  assert.deepEqual(graphMatches(rows, '').map(r => r.name), ['CA-125', 'IL-18', 'Zonulin'], 'typed findings first');
+  assert.deepEqual(graphMatches(rows, 'muc16').map(r => r.name), ['CA-125'], 'an alias finds the page');
+  assert.deepEqual(graphMatches(rows, 'zonulin').map(r => r.name), ['Zonulin'], 'a page with nothing indexed is still findable');
 });
