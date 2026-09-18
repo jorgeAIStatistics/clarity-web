@@ -60,3 +60,17 @@ test('the methods snippet states the boundary of the search, not just its result
   // A question with nothing indexed must say so rather than going quiet.
   assert.match(methodsSnippet({ question: 'x'.repeat(10), rows: [], briefs: [] }), /no typed finding is indexed/);
 });
+
+test('sample size travels with the estimate it belongs to', () => {
+  // n was stored on every finding and appeared in neither the table nor the export, so an estimate
+  // arrived without the one number needed to weigh it.
+  const withN = { ...result, graph_findings: [{ ...result.graph_findings[0], n: 158 }, result.graph_findings[1]] };
+  const rows = workspaceRows({ result: withN, estimates: [] });
+  assert.equal(rows[0].n, 158);
+  assert.equal(rows[1].n, null, 'an abstract that did not report n must not gain one');
+  assert.ok(COLUMNS.includes('n'));
+  const header = toTsv(rows).split('\n')[0].split('\t');
+  assert.equal(header[COLUMNS.indexOf('n')], 'n');
+  assert.equal(toTsv(rows).split('\n')[1].split('\t')[COLUMNS.indexOf('n')], '158');
+  assert.equal(toTsv(rows).split('\n')[2].split('\t')[COLUMNS.indexOf('n')], '', 'an unreported n exports as empty, not as zero');
+});

@@ -83,7 +83,7 @@ export default function FindingsWorkspace({ result, estimates, briefs = [], rest
           <th scope="col"><input type="checkbox" aria-label="Select every row shown" checked={shown.length > 0 && chosen.length === shown.length}
             onChange={e => setSelected(e.target.checked ? shown.map(r => r.id) : [])} /></th>
           <th scope="col">Entity</th><th scope="col">Kind</th><th scope="col">Reported</th><th scope="col">For</th>
-          <th scope="col">Population</th><th scope="col">Layer</th><th scope="col">Source</th>
+          <th scope="col">n</th><th scope="col">Population</th><th scope="col">Assay</th><th scope="col">Layer</th><th scope="col">Source</th>
         </tr></thead>
         <tbody>{shown.map(row => <tr key={row.id} data-selected={selected.includes(row.id) || undefined}>
           <td><input type="checkbox" aria-label={`Select ${row.entity} ${row.display}`} checked={selected.includes(row.id)}
@@ -92,9 +92,11 @@ export default function FindingsWorkspace({ result, estimates, briefs = [], rest
           <td>{row.kind}</td>
           <td className="qm-num">{row.display || '—'}</td>
           <td>{row.target || '—'}</td>
+          <td className="qm-num">{Number.isFinite(Number(row.n)) && row.n !== null ? Number(row.n).toLocaleString('en-US') : '—'}</td>
           <td>{row.population || 'Not stated'}</td>
+          <td>{row.assay || 'Not stated'}</td>
           <td>{row.layer || '—'}</td>
-          <td>{SOURCES[row.source]}{row.pmid && <> · {safeSource(`https://pubmed.ncbi.nlm.nih.gov/${row.pmid}/`)
+          <td>{SOURCES[row.source]}{row.review !== 'automated' && <> · <strong>{row.review === 'reviewed' ? 'Reviewed' : 'Partly reviewed'}</strong></>}{row.pmid && <> · {safeSource(`https://pubmed.ncbi.nlm.nih.gov/${row.pmid}/`)
             ? <a href={`https://pubmed.ncbi.nlm.nih.gov/${row.pmid}/`} target="_blank" rel="noreferrer">PMID {row.pmid} <ArrowUpRight size={12} aria-hidden="true" /></a>
             : `PMID ${row.pmid}`}</>}</td>
         </tr>)}</tbody>

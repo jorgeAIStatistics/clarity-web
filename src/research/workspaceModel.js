@@ -12,7 +12,7 @@ export function workspaceRows({ result, estimates = [] } = {}) {
   const rows = (result?.graph_findings || []).map(f => ({
     id: `graph:${f.id}`, source: 'graph', entityId: f.entity_id, entity: names[f.entity_id] || f.entity_id,
     kind: f.kind || 'association', measure: f.measure, value: f.estimate ?? null, lower: f.lower ?? null, upper: f.upper ?? null,
-    unit: f.unit ?? null, cutoff: f.cutoff ?? null, target: f.target || f.statement || '', population: f.population || '',
+    unit: f.unit ?? null, cutoff: f.cutoff ?? null, n: f.n ?? null, target: f.target || f.statement || '', population: f.population || '',
     assay: f.assay || '', layer: f.layer || '', pmid: f.pmid || '', title: f.title || '', year: f.year || '',
     quote: f.quote || '', review: f.review_state || 'automated',
     display: valueText({ measure: f.measure, estimate: f.estimate, lower: f.lower, upper: f.upper, level: f.level, unit: f.unit, cutoff: f.cutoff, cutoff_unit: f.cutoff_unit }),
@@ -21,7 +21,7 @@ export function workspaceRows({ result, estimates = [] } = {}) {
     rows.push({
       id: `retrieved:${e.id}`, source: 'retrieved', entityId: (e.entityIds || [])[0] || '', entity: (e.entityIds || []).map(id => names[id]).filter(Boolean).join(' · '),
       kind: { Association: 'association', Prediction: 'discrimination', 'Treatment outcomes': 'effect', 'Diagnostic performance': 'classification' }[e.mode] || 'association',
-      measure: e.fam?.label || '', value: e.point ?? null, lower: e.lower ?? null, upper: e.upper ?? null, unit: e.unit ?? null, cutoff: null,
+      measure: e.fam?.label || '', value: e.point ?? null, lower: e.lower ?? null, upper: e.upper ?? null, unit: e.unit ?? null, cutoff: null, n: e.n ?? null,
       target: e.outcome || '', population: e.population || '', assay: '', layer: e.layer || '', pmid: e.pmid || '', title: e.title || '',
       year: e.year || '', quote: e.quote || '', review: e.review === 'reviewed' ? 'reviewed' : 'automated',
       display: [e.fam?.label, e.point, Number.isFinite(e.lower) ? `(${e.lower} to ${e.upper})` : ''].filter(x => x !== '' && x != null).join(' '),
@@ -48,7 +48,9 @@ export function filterRows(rows, { kinds = [], layers = [], entities = [], sourc
     && (!needle || [row.entity, row.target, row.population, row.measure, row.assay, row.quote, row.pmid].join(' ').toLowerCase().includes(needle)));
 }
 
-export const COLUMNS = ['entity', 'kind', 'measure', 'value', 'lower', 'upper', 'unit', 'cutoff', 'target', 'population', 'assay', 'layer', 'pmid', 'year', 'review', 'source', 'quote'];
+// Sample size sits beside the estimate because an estimate without it cannot be weighed, and it was
+// stored on every finding while appearing in neither the table nor the export.
+export const COLUMNS = ['entity', 'kind', 'measure', 'value', 'lower', 'upper', 'unit', 'cutoff', 'n', 'target', 'population', 'assay', 'layer', 'pmid', 'year', 'review', 'source', 'quote'];
 const cell = (row, key) => (key === 'source' ? SOURCES[row.source] || row.source : clean(row[key]));
 
 export function toTsv(rows) {
