@@ -104,3 +104,9 @@
 .gp-stale{margin:0 0 .9rem;padding:.55rem .75rem;border-left:2px solid var(--gp-accent,#34e0be);
   background:color-mix(in srgb,var(--gp-accent,#34e0be) 7%,transparent);border-radius:0 4px 4px 0;
   font-size:.82rem;line-height:1.45;color:var(--ev-text-muted,#9aa4b2);max-width:60ch;}
+
+/* Identifiers are strings to copy and compare, so they are set in monospace at the size of the
+   surrounding text rather than shrunk into decoration. */
+.gp-ids code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;font-size:.94em;
+  letter-spacing:-.01em;background:color-mix(in srgb,currentColor 7%,transparent);
+  padding:.05em .34em;border-radius:3px;}

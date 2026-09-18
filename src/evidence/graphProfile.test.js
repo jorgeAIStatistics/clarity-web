@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose } from './graphProfile.js';
+import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates } from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -337,4 +337,50 @@ test('a rejected paper is described by what it did measure', () => {
                /findings about other markers/);
   assert.match(deadLetterText({ reasons: { rejected_numeric_token: 3 } }), /number could not be read exactly from the source \(3×\)/);
   assert.equal(deadLetterText({ reasons: {} }), 'no typed finding passed validation');
+});
+
+test('a locus link is offered for the objects a locus describes, and never for the others', () => {
+  const egfrGene = { kind: 'Gene', locus: { assembly: 'GRCh38', chrom: '7', start_bp: 55018820, end_bp: 55211628, gene_symbol: 'EGFR' } };
+  const link = ucscLink(egfrGene);
+  assert.equal(link.position, 'chr7:55018820-55211628');
+  assert.equal(link.url, 'https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg38&position=chr7%3A55018820-55211628');
+  assert.match(link.about, /locus of EGFR on GRCh38/);
+
+  // A variant alters a gene; the coordinates shown are the gene's and the caption must say so.
+  const variant = ucscLink({ kind: 'Variant', locus: egfrGene.locus });
+  assert.match(variant.about, /these coordinates are the gene's, not the variant's/);
+
+  // A serum protein measurement is not a question about a stretch of chromosome.
+  assert.equal(ucscLink({ kind: 'Biomarker', locus: egfrGene.locus }), null);
+  assert.equal(ucscLink({ kind: 'Test', locus: egfrGene.locus }), null);
+  // A coordinate read on an assembly we did not record is not a place.
+  assert.equal(ucscLink({ kind: 'Gene', locus: { ...egfrGene.locus, assembly: 'NCBI36' } }), null);
+  assert.equal(ucscLink({ kind: 'Gene', locus: { assembly: 'GRCh38', chrom: '7' } }), null);
+  assert.equal(ucscLink({ kind: 'Gene' }), null);
+});
+
+test('the canonical protein gets its own identifier row, distinct from the gene', () => {
+  const links = externalLinks({ external_ids: { ensembl: 'ENSG00000150782', ensembl_protein: 'ENSP00000280357', uniprot: 'Q14116' } });
+  assert.deepEqual(links.map(l => [l.label, l.about]),
+                   [['Ensembl', 'gene'], ['UniProt', 'protein'], ['Ensembl protein', 'canonical protein']]);
+  assert.match(links[2].url, /ProteinSummary\?p=ENSP00000280357$/);
+});
+
+test('a gene keeps an address of its own even when a protein shares its name', () => {
+  // Seven genes were unreachable: the protein won the plain slug and the gene was dropped, so
+  // "encoded by EGFR gene" linked back to the EGFR protein page it was sitting on.
+  assert.equal(graphPath('gene:egfr'), '/biomarkers/egfr-gene');
+  assert.equal(graphPath('gene:il18'), '/biomarkers/il18-gene');
+  assert.equal(graphPath('variant:braf-v600e'), '/biomarkers/braf-v600e-variant');
+  assert.equal(graphPath('biomarker:il-18'), '/biomarkers/il-18');
+  assert.equal(graphPath('condition:breast-cancer'), null, 'a condition has no biomarker page');
+  assert.equal(graphPath('compound:olaparib'), null);
+  assert.equal(graphPath('nonsense'), null);
+
+  // The suffix names the kind to try first, so the suffixed address resolves either way.
+  assert.deepEqual(graphCandidates('biomarker', 'egfr-gene').slice(0, 2), ['gene:egfr', 'biomarker:egfr-gene']);
+  assert.deepEqual(graphCandidates('biomarker', 'il-18')[0], 'biomarker:il-18');
+  assert.ok(graphCandidates('biomarker', 'braf-v600e-variant').includes('variant:braf-v600e'));
+  // A slug that merely ends in the word is still tried plainly afterwards.
+  assert.ok(graphCandidates('biomarker', 'egfr-gene').includes('variant:egfr-gene'));
 });

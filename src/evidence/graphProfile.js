@@ -180,6 +180,28 @@ export function findingsJson(entity={},rows=[],layers=[]){
 export const ROUTE_PREFIXES={biomarker:['biomarker','variant','gene','protein','metabolite'],diagnostic:['test','assay'],screening:['test','assay'],precision_oncology:['precision_context']};
 export const ROUTE_TYPES={biomarkers:['biomarker'],diagnostics:['diagnostic'],screening:['screening'],tests:['diagnostic','screening'],'precision-medicine':['precision_oncology']};
 export const graphPrefixes=type=>ROUTE_PREFIXES[type]||ROUTE_PREFIXES.biomarker;
+// A gene and the protein it encodes share a name, so the gene is addressed with a suffix and that
+// suffix names the kind to look for. Tried first, then the plain prefixes, so an entity whose own
+// slug happens to end in -gene still resolves.
+const KIND_SUFFIX={'-gene':'gene','-variant':'variant','-protein':'protein'};
+// The address to link a molecular neighbour by. A gene, variant or protein always takes the
+// suffixed form: it is the only spelling that cannot land on the protein that shares its name, and
+// graphCandidates resolves it whether or not there was a collision to begin with.
+export function graphPath(id=''){
+  const [prefix,slug]=String(id).split(':');
+  if(!slug)return null;
+  if(['gene','variant','protein'].includes(prefix))return `/biomarkers/${slug}-${prefix}`;
+  if(prefix==='biomarker'||prefix==='metabolite')return `/biomarkers/${slug}`;
+  return null;
+}
+
+export function graphCandidates(type,slug){
+  const out=[];
+  for(const [suffix,prefix] of Object.entries(KIND_SUFFIX))
+    if(slug.endsWith(suffix)&&slug.length>suffix.length)out.push(`${prefix}:${slug.slice(0,-suffix.length)}`);
+  for(const prefix of graphPrefixes(type))out.push(`${prefix}:${slug}`);
+  return out;
+}
 export const routeTypes=root=>ROUTE_TYPES[root]||[];
 
 // ---- The profile contract: Q1-Q5 and the evidence ladder ------------------
@@ -409,6 +431,7 @@ const ID_SOURCES={
   hgnc:['HGNC','gene',id=>`https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/${encodeURIComponent(id)}`],
   ensembl:['Ensembl','gene',id=>`https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${encodeURIComponent(id)}`],
   uniprot:['UniProt','protein',id=>`https://www.uniprot.org/uniprotkb/${encodeURIComponent(id)}`],
+  ensembl_protein:['Ensembl protein','canonical protein',id=>`https://www.ensembl.org/Homo_sapiens/Transcript/ProteinSummary?p=${encodeURIComponent(id)}`],
   mondo:['MONDO','disease',id=>`https://www.ebi.ac.uk/ols4/ontologies/mondo/classes?short_form=${encodeURIComponent(String(id).replace(':','_'))}`],
   chebi:['ChEBI','molecule',id=>`https://www.ebi.ac.uk/chebi/searchId.do?chebiId=${encodeURIComponent(id)}`],
   ncit:['NCIt','concept',id=>`https://ncithesaurus.nci.nih.gov/ncitbrowser/ConceptReport.jsp?code=${encodeURIComponent(id)}`],
@@ -417,6 +440,29 @@ export function externalLinks(entity={}){
   const ids=entity.external_ids||{};
   return Object.entries(ID_SOURCES).filter(([key])=>ids[key]).map(([key,[label,about,url]])=>({key,label,about,id:ids[key],url:url(ids[key])}));
 }
+// Only two assemblies of a coordinate exist for our purposes, and we publish one. A coordinate
+// read on an assembly we did not record is not a place, so it produces no link at all.
+const UCSC_ASSEMBLY={GRCh38:'hg38'};
+
+// A locus link belongs on the objects a locus describes: a gene, and a variant of one. A serum
+// protein measurement is not a question about a stretch of chromosome, so those pages get none —
+// this is a link out to UCSC, never a genome browser embedded in Clarity.
+export function ucscLink(entity={}){
+  const kind=entity.kind||entity.type;
+  if(!['Gene','gene','Variant','variant'].includes(kind))return null;
+  const l=entity.locus||{};
+  const db=UCSC_ASSEMBLY[l.assembly];
+  if(!db||!l.chrom||!Number.isFinite(Number(l.start_bp))||!Number.isFinite(Number(l.end_bp)))return null;
+  const position=`chr${l.chrom}:${Number(l.start_bp)}-${Number(l.end_bp)}`;
+  return {
+    position,assembly:l.assembly,symbol:l.gene_symbol||null,
+    url:`https://genome.ucsc.edu/cgi-bin/hgTracks?db=${db}&position=${encodeURIComponent(position)}`,
+    about:['Variant','variant'].includes(kind)
+      ? `The locus of ${l.gene_symbol||'the gene'} on ${l.assembly}. The variant alters this gene; these coordinates are the gene's, not the variant's.`
+      : `The locus of ${l.gene_symbol||'this gene'} on ${l.assembly}.`,
+  };
+}
+
 export function idCaption(entity={}){
   const kind=entity.kind||entity.type;
   if(kind==='Variant'||kind==='variant')return 'These identify the gene and protein this variant alters. The variant itself is a separate object.';

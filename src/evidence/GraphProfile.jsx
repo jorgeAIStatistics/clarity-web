@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphMatches,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,kindBadge,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
 import './graph-profile.css';
 
@@ -69,8 +69,8 @@ export function useGraphEntity(slug,type='biomarker',attempt=0){
       const controller=new AbortController();inFlight=controller;
       const timer=setTimeout(()=>controller.abort(),15000);
       try{
-        for(const prefix of graphPrefixes(type)){
-          const response=await fetch(`${API_BASE}/api/evidence/graph/entity/${prefix}:${encodeURIComponent(slug)}`,{signal:controller.signal});
+        for(const candidate of graphCandidates(type,slug)){
+          const response=await fetch(`${API_BASE}/api/evidence/graph/entity/${encodeURIComponent(candidate)}`,{signal:controller.signal});
           if(response.status===404)continue;
           if(!response.ok)throw Object.assign(Error('request_failed'),{outcome:response.status});
           return response.json();
@@ -138,7 +138,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
   const stale=freshness(state.data);
   const total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
   const q1=identity(entity,related),q2=biology(entity,findings),q3=measurement(entity,findings),q4=meaning(entity,findings),q5=utility(entity,findings);
-  const rungs=ladder(entity,findings),scope=scopeNote(entity,findings),ask=questions(type),links=externalLinks(entity);
+  const rungs=ladder(entity,findings),scope=scopeNote(entity,findings),ask=questions(type),links=externalLinks(entity),ucsc=ucscLink(entity);
   const download=(text,mime,extension)=>{
     const url=URL.createObjectURL(new Blob([text],{type:mime}));
     const link=Object.assign(document.createElement('a'),{href:url,download:`${entity.id.replace(':','-')}-findings.${extension}`});
@@ -174,13 +174,14 @@ export default function GraphProfile({slug,go,type='biomarker'}){
         {q1.specimen&&<div><dt>Specimen</dt><dd>{q1.specimen}</dd></div>}
         {q1.aliases.length>0&&<div><dt>Aliases</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
       </dl>
-      {links.length>0&&<div className="gp-ids">
-        <ul>{links.map(link=><li key={link.key}><a href={link.url} target="_blank" rel="noreferrer">{link.label} {link.id}</a><small>{link.about}</small></li>)}</ul>
+      {(links.length>0||ucsc)&&<div className="gp-ids">
+        <ul>{links.map(link=><li key={link.key}><a href={link.url} target="_blank" rel="noreferrer">{link.label} <code>{link.id}</code></a><small>{link.about}</small></li>)}
+          {ucsc&&<li key="ucsc"><a href={ucsc.url} target="_blank" rel="noreferrer">UCSC <code>{ucsc.position}</code></a><small>{ucsc.about}</small></li>}</ul>
         <p className="ev-note">{idCaption(entity)}</p>
       </div>}
       {q1.molecular.length>0&&<>
         <p className="ev-note">Gene, protein and variant are separate entities here. A finding about one is never attached to another.</p>
-        <ul className="gp-related">{q1.molecular.map(r=><li key={r.edge+r.id}><span>{relationLabel(r)}</span>{/^(biomarker|variant|gene|protein):/.test(r.id)?<Link to={`/biomarkers/${r.id.split(':')[1]}`} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}<small>{r.kind}</small></li>)}</ul>
+        <ul className="gp-related">{q1.molecular.map(r=>{const to=graphPath(r.id);return <li key={r.edge+r.id}><span>{relationLabel(r)}</span>{to?<Link to={to} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}<small>{r.kind}</small></li>;})}</ul>
       </>}
     </section>
 
