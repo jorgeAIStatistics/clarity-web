@@ -14,7 +14,7 @@ export function workspaceRows({ result, estimates = [] } = {}) {
     kind: f.kind || 'association', measure: f.measure, value: f.estimate ?? null, lower: f.lower ?? null, upper: f.upper ?? null,
     unit: f.unit ?? null, cutoff: f.cutoff ?? null, n: f.n ?? null, target: f.target || f.statement || '', population: f.population || '',
     assay: f.assay || '', layer: f.layer || '', pmid: f.pmid || '', title: f.title || '', year: f.year || '',
-    quote: f.quote || '', review: f.review_state || 'automated',
+    quote: f.quote || '', review: f.review_state || 'automated', provenance: f.provenance || 'unclear',
     display: valueText({ measure: f.measure, estimate: f.estimate, lower: f.lower, upper: f.upper, level: f.level, unit: f.unit, cutoff: f.cutoff, cutoff_unit: f.cutoff_unit }),
   }));
   for (const e of estimates) {
@@ -23,7 +23,7 @@ export function workspaceRows({ result, estimates = [] } = {}) {
       kind: { Association: 'association', Prediction: 'discrimination', 'Treatment outcomes': 'effect', 'Diagnostic performance': 'classification' }[e.mode] || 'association',
       measure: e.fam?.label || '', value: e.point ?? null, lower: e.lower ?? null, upper: e.upper ?? null, unit: e.unit ?? null, cutoff: null, n: e.n ?? null,
       target: e.outcome || '', population: e.population || '', assay: '', layer: e.layer || '', pmid: e.pmid || '', title: e.title || '',
-      year: e.year || '', quote: e.quote || '', review: e.review === 'reviewed' ? 'reviewed' : 'automated',
+      year: e.year || '', quote: e.quote || '', review: e.review === 'reviewed' ? 'reviewed' : 'automated', provenance: 'unclear',
       display: [e.fam?.label, e.point, Number.isFinite(e.lower) ? `(${e.lower} to ${e.upper})` : ''].filter(x => x !== '' && x != null).join(' '),
     });
   }
@@ -51,7 +51,7 @@ export function filterRows(rows, { kinds = [], measures = [], layers = [], entit
 
 // Sample size sits beside the estimate because an estimate without it cannot be weighed, and it was
 // stored on every finding while appearing in neither the table nor the export.
-export const COLUMNS = ['entity', 'kind', 'measure', 'value', 'lower', 'upper', 'unit', 'cutoff', 'n', 'target', 'population', 'assay', 'layer', 'pmid', 'year', 'review', 'source', 'quote'];
+export const COLUMNS = ['entity', 'kind', 'measure', 'value', 'lower', 'upper', 'unit', 'cutoff', 'n', 'target', 'population', 'assay', 'layer', 'pmid', 'year', 'review', 'provenance', 'source', 'quote'];
 const cell = (row, key) => (key === 'source' ? SOURCES[row.source] || row.source : clean(row[key]));
 
 export function toTsv(rows) {

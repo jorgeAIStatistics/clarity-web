@@ -88,3 +88,16 @@ test('measure is a filter of its own, because a kind holds several of them', () 
   assert.equal(filterRows(rows, { measures: ['auc'], kinds: ['discrimination'] }).length, 1);
   assert.equal(filterRows(rows, { measures: [] }).length, 3);
 });
+
+test('an exported row says whose result it is', () => {
+  // A quoted number never reaches a marker page, but a downloaded row should still carry the
+  // classification rather than leaving the reader to assume every row is the paper's own result.
+  const rows = workspaceRows({ result: { ...result, graph_findings: [{ ...result.graph_findings[0], provenance: 'primary' }, result.graph_findings[1]] }, estimates });
+  assert.equal(rows[0].provenance, 'primary');
+  assert.equal(rows[1].provenance, 'unclear', 'a finding with no stated provenance is unclear, never primary');
+  assert.equal(rows[2].provenance, 'unclear', 'a retrieved estimate makes no provenance claim');
+  assert.ok(COLUMNS.includes('provenance'));
+  const header = toTsv(rows).split('\n')[0].split('\t');
+  assert.equal(header[COLUMNS.indexOf('provenance')], 'provenance');
+  assert.equal(toTsv(rows).split('\n')[1].split('\t')[COLUMNS.indexOf('provenance')], 'primary');
+});
