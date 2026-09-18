@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort, catalogFreshness } from './graphProfile.js';
+import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort, catalogFreshness, quotedRows } from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -405,4 +405,25 @@ test('a published catalog is labelled, and a live one carries no caveat', () => 
   // A published copy with 137 rows is not "short" — short means the read returned nothing.
   assert.equal(libraryIsShort({ served_from: 'snapshot', published_at: '2026-09-18T19:26:30Z', graph_rows: 137 }), false);
   assert.match(catalogFreshness({ served_from: 'snapshot' }), /Catalog published earlier/);
+});
+
+test('quoted numbers become their own rows and are never mixed into findings', () => {
+  const payload = {
+    findings: [{ finding: { id: 'obs:1', kind: 'discrimination', measure: 'auc', estimate: 0.884, provenance: 'unclear' }, quote: 'AUC 0.884' }],
+    quoted: [{ finding: { id: 'obs:q1', kind: 'effect', measure: 'risk_ratio', estimate: 1.9, lower: 1.39, upper: 2.62, level: 95, marker: 'EGFR', target: 'response outcomes' },
+               quote: 'The RR reported by Gogishvili et al. [2022] at 1.9', pmid: '42444950', year: 2026 }],
+  };
+  const rows = quotedRows(payload);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].estimate, 1.9);
+  assert.equal(rows[0].pmid, '42444950');
+  assert.match(rows[0].quote, /Gogishvili/);
+  // The counted findings are untouched by any of this.
+  assert.equal(payload.findings.length, 1);
+  // A profile with nothing quoted yields no rows, so the fold never renders empty.
+  assert.deepEqual(quotedRows({ findings: [], quoted: [] }), []);
+  assert.deepEqual(quotedRows({}), []);
+  assert.deepEqual(quotedRows(null), []);
+  // A malformed row without an id is dropped rather than rendered as a blank entry.
+  assert.deepEqual(quotedRows({ quoted: [{ finding: {}, quote: 'x' }] }), []);
 });

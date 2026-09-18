@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,quotedRows,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
 import './graph-profile.css';
 
@@ -135,7 +135,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
   if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><Diagnosis/><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
 
   const {entity,layers,findings,related,studies,dead_letters:dead}=state.data;
-  const stale=freshness(state.data);
+  const stale=freshness(state.data),quoted=quotedRows(state.data);
   const total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
   const q1=identity(entity,related),q2=biology(entity,findings),q3=measurement(entity,findings),q4=meaning(entity,findings),q5=utility(entity,findings);
   const rungs=ladder(entity,findings),scope=scopeNote(entity,findings),ask=questions(type),links=externalLinks(entity),ucsc=ucscLink(entity);
@@ -214,6 +214,15 @@ export default function GraphProfile({slug,go,type='biomarker'}){
         <FindingList rows={g.rows}/>
       </div>)}
       {total>0&&<p className="gp-export">The whole profile as one file: <button type="button" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button> <button type="button" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button> <span className="ev-note">One row per finding, with its passage, source and review state. The workspace below takes a filtered selection instead.</span></p>}
+      {quoted.length>0&&<details className="gp-quoted">
+        <summary>Quoted from other papers — not counted ({quoted.length})</summary>
+        <p className="ev-note">This paper repeated {quoted.length===1?'this number':'these numbers'} from work it cited. {quoted.length===1?'It is':'They are'} not {entity.name} {quoted.length===1?'evidence':'evidence'} from this study, {quoted.length===1?'counts':'count'} toward nothing on this page, and {quoted.length===1?'is':'are'} shown only so the passage is not hidden.</p>
+        <ul className="gp-findings">{quoted.map(r=><li key={r.id}>
+          <div className="gp-finding-head"><strong>{valueText(r)}</strong><span>{[r.target&&`for ${r.target}`,r.population].filter(Boolean).join(' · ')}</span></div>
+          {r.quote&&<blockquote>{r.quote}</blockquote>}
+          <small>{r.pmid?<a href={`https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`} target="_blank" rel="noreferrer">PMID {r.pmid}</a>:'Source'}{r.year?` · ${r.year}`:''} · quoted, not measured here</small>
+        </li>)}</ul>
+      </details>}
     </section>
 
     <section className="gp-q" aria-labelledby="gp-q5">

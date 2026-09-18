@@ -367,6 +367,18 @@ export function ladder(entity={},rows=[]){
 const VAGUE=/^(?:the\s+)?(?:patients?|adults?|participants?|subjects?|individuals?|people|persons?|cases?|humans?|men|women|children|controls?)$/i;
 const statesAPopulation=text=>Boolean(String(text||'').trim())&&!VAGUE.test(String(text).trim());
 
+// Numbers a paper quoted from other papers. They carry no weight here and are never mixed into the
+// findings: this only turns the payload's quoted list into rows a page can fold away. A finding
+// that simply does not say whose result it is stays unlabelled — silence is not a claim of
+// authorship, and badging it "primary" would invent one.
+export function quotedRows(data){
+  return (data?.quoted||[]).map(q=>({
+    id:q.finding?.id,measure:q.finding?.measure,estimate:q.finding?.estimate,lower:q.finding?.lower,upper:q.finding?.upper,
+    level:q.finding?.level,unit:q.finding?.unit,target:q.finding?.target||'',population:q.finding?.population||'',
+    marker:q.finding?.marker||'',quote:q.quote||'',pmid:q.pmid||'',title:q.title||'',year:q.year||'',
+  })).filter(r=>r.id);
+}
+
 export function scopeNote(entity={},rows=[]){
   const list=flatten(rows);
   if(!list.length)return null;

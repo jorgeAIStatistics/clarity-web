@@ -110,3 +110,10 @@
 .gp-ids code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;font-size:.94em;
   letter-spacing:-.01em;background:color-mix(in srgb,currentColor 7%,transparent);
   padding:.05em .34em;border-radius:3px;}
+
+/* Quoted numbers sit closed by default and read as an aside, not as evidence: no accent, no card,
+   and the same muted register as the dead-letter fold below it. */
+.gp-quoted{margin:1rem 0 0;padding:.6rem .8rem;border:1px dashed color-mix(in srgb,currentColor 22%,transparent);
+  border-radius:5px;font-size:.88rem;}
+.gp-quoted>summary{cursor:pointer;color:var(--ev-text-muted,#9aa4b2);font-weight:500;}
+.gp-quoted .gp-findings{margin-top:.6rem;}
