@@ -403,6 +403,14 @@ export async function diagnose(request,base=''){
   return {engine:true,graph:true,text:'The engine and the evidence graph are both answering, so this page failed for some other reason. Trying again usually works.'};
 }
 
+// An engine that answers 200 with zero graph rows has read a cold or unreachable database. The
+// page cannot tell that from a genuinely small library, and believing it is how the index read
+// "14 profiles" with nothing saying a read had failed. An older engine sends no count at all, and
+// silence is not a zero.
+export function libraryIsShort(payload){
+  return typeof payload?.graph_rows==='number'&&payload.graph_rows===0;
+}
+
 export const RETRY_DELAYS=[1500,4000];
 export function shouldRetry(outcome){
   if(outcome==='network')return true;

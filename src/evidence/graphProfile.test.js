@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates } from './graphProfile.js';
+import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort } from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -383,4 +383,15 @@ test('a gene keeps an address of its own even when a protein shares its name', (
   assert.ok(graphCandidates('biomarker', 'braf-v600e-variant').includes('variant:braf-v600e'));
   // A slug that merely ends in the word is still tried plainly afterwards.
   assert.ok(graphCandidates('biomarker', 'egfr-gene').includes('variant:egfr-gene'));
+});
+
+test('an engine answering with no graph rows is a failed read, not a small library', () => {
+  // Production served exactly this: 200 OK, zero graph rows, and the index said "14 profiles"
+  // with nothing indicating anything had gone wrong.
+  assert.equal(libraryIsShort({ graph_rows: 0, entries: [] }), true);
+  assert.equal(libraryIsShort({ graph_rows: 137, entries: [] }), false);
+  // An older engine sends no count, and silence is not a zero.
+  assert.equal(libraryIsShort({ entries: [] }), false);
+  assert.equal(libraryIsShort(null), false);
+  assert.equal(libraryIsShort({ graph_rows: null }), false);
 });

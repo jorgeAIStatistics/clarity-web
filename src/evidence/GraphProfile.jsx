@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,libraryIsShort,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
 import './graph-profile.css';
 
@@ -257,7 +257,7 @@ export function useGraphBiomarkers(enabled=true){
     fetchWithRetry(once,{
       sleep:ms=>new Promise(resolve=>{waiting=setTimeout(resolve,ms);}),
       onRetry:()=>{if(active)setState(s=>({...s,waking:true}));},
-    }).then(d=>{if(active)setState({rows:(d.entries||[]).filter(e=>String(e.id).startsWith('graph:')),failed:false,waking:false});})
+    }).then(d=>{if(active)setState({rows:(d.entries||[]).filter(e=>String(e.id).startsWith('graph:')),failed:libraryIsShort(d),waking:false});})
       .catch(()=>{if(active)setState({rows:null,failed:true,waking:false});});
     return()=>{active=false;clearTimeout(waiting);};
   },[enabled]);
