@@ -227,3 +227,23 @@ test('estimate rows carry the contract vocabulary, not the figure vocabulary', (
   assert.ok(measures.some(([kind, measure]) => kind === 'association' && measure === 'hazard_ratio'));
   assert.deepEqual(estimateRows([], 'entity:apob'), []);
 });
+
+test('two different measures never share an axis, whatever else they have in common', () => {
+  // A hazard ratio and an AUC are not comparable magnitudes. Panels are keyed by measure family
+  // and question type together, so the same outcome and the same entity still separate them.
+  const sameOutcomeDifferentMeasures = [
+    { id: 'a', entityIds: ['entity:apob'], mode: 'Association', fam: { key: 'hr', label: 'HR' }, point: 1.4, lower: 1.2, upper: 1.7, outcome: 'Cardiovascular events', quote: 'HR 1.4', layer: 'observational', pmid: '1' },
+    { id: 'b', entityIds: ['entity:apob'], mode: 'Prediction', fam: { key: 'auc', label: 'AUC' }, point: 0.71, lower: 0.66, upper: 0.76, outcome: 'Cardiovascular events', quote: 'AUC 0.71', layer: 'observational', pmid: '2' },
+    { id: 'c', entityIds: ['entity:apob'], mode: 'Association', fam: { key: 'hr', label: 'HR' }, point: 1.1, lower: 1.0, upper: 1.2, outcome: 'Cardiovascular events', quote: 'HR 1.1', layer: 'observational', pmid: '3' },
+  ];
+  const panels = landscapePanels(sameOutcomeDifferentMeasures, 'Cardiovascular events', []);
+  for (const panel of panels) {
+    const families = new Set(panel.published.map(e => e.fam.key));
+    assert.ok(families.size <= 1, `a panel mixed ${[...families].join(' and ')} on one axis`);
+  }
+  const hr = panels.find(p => p.fam.key === 'hr');
+  const auc = panels.find(p => p.fam.key === 'auc');
+  assert.equal(hr.published.length, 2, 'two hazard ratios for one outcome do share an axis');
+  assert.equal(auc.published.length, 1);
+  assert.notEqual(hr.key, auc.key);
+});

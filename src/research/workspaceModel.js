@@ -36,12 +36,13 @@ export function facets(rows) {
     for (const row of rows) if (row[key]) tally.set(row[key], (tally.get(row[key]) || 0) + 1);
     return [...tally].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]))).map(([value, n]) => ({ value, n }));
   };
-  return { kind: count('kind'), layer: count('layer'), entity: count('entity'), source: count('source') };
+  return { kind: count('kind'), measure: count('measure'), layer: count('layer'), entity: count('entity'), source: count('source') };
 }
 
-export function filterRows(rows, { kinds = [], layers = [], entities = [], sources = [], text = '' } = {}) {
+export function filterRows(rows, { kinds = [], measures = [], layers = [], entities = [], sources = [], text = '' } = {}) {
   const needle = text.trim().toLowerCase();
   return rows.filter(row => (!kinds.length || kinds.includes(row.kind))
+    && (!measures.length || measures.includes(row.measure))
     && (!layers.length || layers.includes(row.layer))
     && (!entities.length || entities.includes(row.entity))
     && (!sources.length || sources.includes(row.source))

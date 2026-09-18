@@ -74,3 +74,17 @@ test('sample size travels with the estimate it belongs to', () => {
   assert.equal(toTsv(rows).split('\n')[1].split('\t')[COLUMNS.indexOf('n')], '158');
   assert.equal(toTsv(rows).split('\n')[2].split('\t')[COLUMNS.indexOf('n')], '', 'an unreported n exports as empty, not as zero');
 });
+
+test('measure is a filter of its own, because a kind holds several of them', () => {
+  // "discrimination" covers AUC and C-index; a researcher comparing AUCs should not have to read
+  // past C-index rows to find them.
+  const rows = workspaceRows({ result, estimates });
+  const counts = facets(rows);
+  assert.deepEqual(counts.measure.map(m => m.value).sort(), ['HR', 'auc', 'sensitivity']);
+  assert.equal(filterRows(rows, { measures: ['auc'] }).length, 1);
+  assert.equal(filterRows(rows, { measures: ['auc', 'sensitivity'] }).length, 2);
+  // It composes with the others rather than replacing them.
+  assert.equal(filterRows(rows, { measures: ['auc'], kinds: ['classification'] }).length, 0);
+  assert.equal(filterRows(rows, { measures: ['auc'], kinds: ['discrimination'] }).length, 1);
+  assert.equal(filterRows(rows, { measures: [] }).length, 3);
+});

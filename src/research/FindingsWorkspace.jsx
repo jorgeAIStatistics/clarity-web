@@ -3,7 +3,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { safeSource } from '../platform/profileModel.js';
 import { workspaceRows, facets, filterRows, toTsv, toCsv, toJson, methodsSnippet, SOURCES, COLUMNS } from './workspaceModel.js';
 
-const FACETS = [['kind', 'Finding kind'], ['layer', 'Layer'], ['entity', 'Entity'], ['source', 'Where it came from']];
+const FACETS = [['kind', 'Finding kind'], ['measure', 'Measure'], ['layer', 'Layer'], ['entity', 'Entity'], ['source', 'Where it came from']];
 const label = (facet, value) => (facet === 'source' ? SOURCES[value] || value : value);
 
 function download(text, mime, extension) {
@@ -18,7 +18,7 @@ export default function FindingsWorkspace({ result, estimates, briefs = [], rest
                                             intro = 'Every finding behind this map in one table: filter it, take the rows you need, and copy a methods sentence that states what was and was not in the library.' }) {
   const rows = useMemo(() => workspaceRows({ result, estimates }), [result, estimates]);
   const options = useMemo(() => facets(rows), [rows]);
-  const [filters, setFilters] = useState({ kinds: [], layers: [], entities: [], sources: [], text: '' });
+  const [filters, setFilters] = useState({ kinds: [], measures: [], layers: [], entities: [], sources: [], text: '' });
   const [selected, setSelected] = useState([]);
   const [said, setSaid] = useState('');
   const shown = useMemo(() => filterRows(rows, filters), [rows, filters]);
@@ -28,6 +28,7 @@ export default function FindingsWorkspace({ result, estimates, briefs = [], rest
   const taken = chosen.length ? chosen : shown;
   const described = [
     filters.kinds.length && `kind ${filters.kinds.join(' or ')}`,
+    filters.measures.length && `measure ${filters.measures.join(' or ')}`,
     filters.layers.length && `layer ${filters.layers.join(' or ')}`,
     filters.entities.length && `entity ${filters.entities.join(' or ')}`,
     filters.sources.length && `source ${filters.sources.map(s => SOURCES[s] || s).join(' or ')}`,
@@ -54,7 +55,7 @@ export default function FindingsWorkspace({ result, estimates, briefs = [], rest
       {FACETS.filter(([facet]) => options[facet].length > 1).map(([facet, title]) => <fieldset key={facet}>
         <legend>{title}</legend>
         {options[facet].map(option => {
-          const key = { kind: 'kinds', layer: 'layers', entity: 'entities', source: 'sources' }[facet];
+          const key = { kind: 'kinds', measure: 'measures', layer: 'layers', entity: 'entities', source: 'sources' }[facet];
           const active = filters[key].includes(option.value);
           return <button type="button" key={option.value} aria-pressed={active} onClick={() => toggle(key, option.value)}>
             {label(facet, option.value)} <span>{option.n}</span>
