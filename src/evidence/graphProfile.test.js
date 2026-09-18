@@ -265,11 +265,16 @@ test('a page served from the published snapshot says when it was published', () 
   assert.equal(live, null, 'a live read needs no caveat');
   const stale = freshness({ served_from: 'snapshot', published_at: '2026-09-17T15:38:54Z' });
   assert.match(stale, /Published 2026-09-17/);
-  assert.match(stale, /did not answer/);
+  assert.match(stale, /did not answer,/);
   assert.match(stale, /a finding added since then is not shown/);
   // An older engine that does not send the field is treated as live, not as stale.
   assert.equal(freshness({ findings: [] }), null);
   assert.match(freshness({ served_from: 'snapshot' }), /last published copy/);
+  // A cold connection that was still opening is a different fact from one that could not open.
+  assert.match(freshness({ served_from: 'snapshot', published_at: '2026-09-18T02:00:42Z', fallback_reason: 'slow' }),
+               /did not answer in time/);
+  assert.doesNotMatch(freshness({ served_from: 'snapshot', published_at: '2026-09-18T02:00:42Z', fallback_reason: 'failed' }),
+                      /in time/);
 });
 
 test('the catalog leads with what can answer something, and search reaches the rest', () => {

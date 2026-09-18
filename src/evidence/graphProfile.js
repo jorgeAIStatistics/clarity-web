@@ -361,8 +361,11 @@ export function scopeNote(entity={},rows=[]){
 export function freshness(data){
   if(data?.served_from!=='snapshot')return null;
   const at=String(data.published_at||'').slice(0,10);
-  return at?`Published ${at}. The live evidence graph did not answer, so this page is the last published copy; a finding added since then is not shown.`
-           :'The live evidence graph did not answer, so this page is the last published copy.';
+  // Slow and unreachable are different facts about the engine, and a reader deciding whether to
+  // reload benefits from knowing which one they hit.
+  const why=data.fallback_reason==='slow'?'did not answer in time':'did not answer';
+  return at?`Published ${at}. The live evidence graph ${why}, so this page is the last published copy; a finding added since then is not shown.`
+           :`The live evidence graph ${why}, so this page is the last published copy.`;
 }
 
 // When a profile will not load, "try again in a minute" is a guess. These two endpoints turn it
