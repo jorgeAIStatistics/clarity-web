@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,libraryIsShort,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
 import './graph-profile.css';
 
@@ -242,7 +242,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
 // the curated profiles, which reads as "the library is small" rather than "a request failed". It
 // retries on the statuses a restarting engine returns, and says plainly when it has given up.
 export function useGraphBiomarkers(enabled=true){
-  const [state,setState]=useState({rows:null,failed:false,waking:false});
+  const [state,setState]=useState({rows:null,failed:false,waking:false,published:null});
   useEffect(()=>{
     if(!enabled)return undefined;
     let active=true,waiting=null;
@@ -257,8 +257,8 @@ export function useGraphBiomarkers(enabled=true){
     fetchWithRetry(once,{
       sleep:ms=>new Promise(resolve=>{waiting=setTimeout(resolve,ms);}),
       onRetry:()=>{if(active)setState(s=>({...s,waking:true}));},
-    }).then(d=>{if(active)setState({rows:(d.entries||[]).filter(e=>String(e.id).startsWith('graph:')),failed:libraryIsShort(d),waking:false});})
-      .catch(()=>{if(active)setState({rows:null,failed:true,waking:false});});
+    }).then(d=>{if(active)setState({rows:(d.entries||[]).filter(e=>String(e.id).startsWith('graph:')),failed:libraryIsShort(d),waking:false,published:catalogFreshness(d)});})
+      .catch(()=>{if(active)setState({rows:null,failed:true,waking:false,published:null});});
     return()=>{active=false;clearTimeout(waiting);};
   },[enabled]);
   return state;
@@ -281,11 +281,13 @@ export function GraphBiomarkerList({go,query='',rows=undefined,failed=false,labe
   const fetched=useGraphBiomarkers(rows===undefined);
   const all=rows===undefined?fetched.rows:rows, missing=rows===undefined?fetched.failed:failed;
   const waking=rows===undefined&&fetched.waking&&!all;
+  const published=rows===undefined?fetched.published:null;
   const shown=graphMatches(all,query);
   // Pages that can answer something lead; names with nothing indexed stay searchable behind a fold.
   const withFindings=shown.filter(e=>e.coverage.quantified_outcomes>0),gaps=shown.filter(e=>!e.coverage.quantified_outcomes);
   return <section className="ev-browser" aria-labelledby="gp-graph-list">
     <div className="ev-library-title"><h2 id="gp-graph-list">{label}{all?` (${all.length})`:''}</h2><span role="status">{missing?'These profiles could not be loaded, so this count is short. The engine may be restarting.':all?`${withFindings.length} with typed findings · ${gaps.length} not yet`:waking?'The evidence engine is waking up. Retrying…':'Loading…'}</span></div>
+    {published&&<p className="gp-stale" role="status">{published}</p>}
     <p className="ev-note">Automated graph profiles: aliases, five evidence layers and typed findings with source passages. GAP means no typed finding is indexed yet, not that none exist.</p>
     {all&&<>
       {withFindings.length>0&&<div className="ev-grid">{withFindings.map(e=><Card key={e.id} entity={e} go={go}/>)}</div>}

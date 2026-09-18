@@ -411,6 +411,15 @@ export function libraryIsShort(payload){
   return typeof payload?.graph_rows==='number'&&payload.graph_rows===0;
 }
 
+// The catalog takes about thirteen seconds to build on a cold process, so the engine serves the
+// last published copy instead of letting the page time out into its fourteen curated profiles.
+// Readable, but possibly behind, and the page says which rather than letting one pass for the other.
+export function catalogFreshness(payload){
+  if(payload?.served_from!=='snapshot')return null;
+  const at=String(payload.published_at||'').slice(0,10);
+  return `Catalog published ${at||'earlier'}. The live evidence graph did not answer in time, so this list may be short of nodes added since.`;
+}
+
 export const RETRY_DELAYS=[1500,4000];
 export function shouldRetry(outcome){
   if(outcome==='network')return true;

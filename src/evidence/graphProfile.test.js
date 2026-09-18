@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort } from './graphProfile.js';
+import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort, catalogFreshness } from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -394,4 +394,15 @@ test('an engine answering with no graph rows is a failed read, not a small libra
   assert.equal(libraryIsShort({ entries: [] }), false);
   assert.equal(libraryIsShort(null), false);
   assert.equal(libraryIsShort({ graph_rows: null }), false);
+});
+
+test('a published catalog is labelled, and a live one carries no caveat', () => {
+  assert.equal(catalogFreshness({ served_from: 'graph', graph_rows: 137 }), null);
+  const stale = catalogFreshness({ served_from: 'snapshot', published_at: '2026-09-18T19:26:30Z', graph_rows: 137 });
+  assert.match(stale, /Catalog published 2026-09-18/);
+  assert.match(stale, /did not answer in time/);
+  assert.match(stale, /short of nodes added since/);
+  // A published copy with 137 rows is not "short" — short means the read returned nothing.
+  assert.equal(libraryIsShort({ served_from: 'snapshot', published_at: '2026-09-18T19:26:30Z', graph_rows: 137 }), false);
+  assert.match(catalogFreshness({ served_from: 'snapshot' }), /Catalog published earlier/);
 });
