@@ -56,6 +56,9 @@ test('the methods snippet states the boundary of the search, not just its result
   assert.match(snippet, /Not in this library for at least one entity: clinical utility, biology\./);
   assert.match(snippet, /Absence here means Clarity holds no matching record, not that no such study exists\./);
   assert.match(snippet, /automated and not expert-reviewed/);
+  // A methods section implies a synthesis unless it says otherwise.
+  assert.match(snippet, /No estimate is pooled, meta-analysed or converted between measures/);
+  assert.match(snippet, /never placed on one axis/);
   assert.match(snippet, /filtered by kind = discrimination/);
   // A question with nothing indexed must say so rather than going quiet.
   assert.match(methodsSnippet({ question: 'x'.repeat(10), rows: [], briefs: [] }), /no typed finding is indexed/);

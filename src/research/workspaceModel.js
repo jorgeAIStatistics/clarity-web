@@ -92,6 +92,9 @@ export function methodsSnippet({ question = '', restatement = '', rows = [], bri
     retrieved.length ? `Retrieved for this question: ${retrieved.length} quote-backed estimate${retrieved.length === 1 ? '' : 's'} from indexed records.` : null,
     missing.length ? `Not in this library for at least one entity: ${missing.join(', ').toLowerCase()}. Absence here means Clarity holds no matching record, not that no such study exists.` : null,
     filters ? `Rows shown were filtered by ${filters}.` : null,
+    // Anyone pasting this into a methods section is describing a search, and a reader of that
+    // section will assume a synthesis unless told otherwise. Nothing here is pooled.
+    'No estimate is pooled, meta-analysed or converted between measures: each is reported as its own source stated it, and estimates of different measures are never placed on one axis.',
     `Extraction is automated and not expert-reviewed. Aggregate published results only; no patient-level data. Clarity, ${when}.`,
   ];
   return lines.filter(Boolean).join(' ');
