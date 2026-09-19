@@ -117,3 +117,6 @@
   border-radius:5px;font-size:.88rem;}
 .gp-quoted>summary{cursor:pointer;color:var(--ev-text-muted,#9aa4b2);font-weight:500;}
 .gp-quoted .gp-findings{margin-top:.6rem;}
+
+/* The kind breakdown is secondary to the count it follows. */
+.ev-entity-card-bottom .gp-card-kinds{opacity:.72;}

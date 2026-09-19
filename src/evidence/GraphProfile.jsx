@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,quotedRows,bundledCatalog,bundledProfile,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,quotedRows,provenanceNote,bundledCatalog,bundledProfile,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
 import './graph-profile.css';
 
@@ -45,7 +45,7 @@ function FindingList({rows}){
   return <ul className="gp-findings">{rows.map(f=><li key={f.id}>
     <div className="gp-finding-head"><strong>{valueText(f)}</strong><span>{[f.target&&`for ${f.target}`,f.population,f.setting].filter(Boolean).join(' · ')}</span></div>
     {f.quote&&<blockquote>{f.quote}</blockquote>}
-    <small>{f.pmid&&<a href={`https://pubmed.ncbi.nlm.nih.gov/${f.pmid}/`} target="_blank" rel="noreferrer">PMID {f.pmid}</a>}{f.year?` · ${f.year}`:''}{f.layer?` · ${layerLabel(f.layer)} layer`:''} · {f.review_state==='reviewed'?'Reviewed':f.review_state==='partially_reviewed'?'Partially reviewed':'Automated reading, not expert-reviewed'}</small>
+    <small>{f.pmid&&<a href={`https://pubmed.ncbi.nlm.nih.gov/${f.pmid}/`} target="_blank" rel="noreferrer">PMID {f.pmid}</a>}{f.year?` · ${f.year}`:''}{f.layer?` · ${layerLabel(f.layer)} layer`:''}{provenanceNote(f)?` · ${provenanceNote(f)}`:''} · {f.review_state==='reviewed'?'Reviewed':f.review_state==='partially_reviewed'?'Partially reviewed':'Automated reading, not expert-reviewed'}</small>
   </li>)}</ul>;
 }
 
@@ -157,6 +157,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
         {q1.aliases.length>0&&<div><dt>Also written as</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
         <div><dt>Linked publications</dt><dd>{studies}</dd></div>
         <div><dt>Typed findings</dt><dd>{total}</dd></div>
+        {quoted.length>0&&<div><dt>Quoted, not counted</dt><dd>{quoted.length}</dd></div>}
       </dl>
     </Hero>
 
@@ -220,7 +221,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
       </div>)}
       {total>0&&<p className="gp-export">The whole profile as one file: <button type="button" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button> <button type="button" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button> <span className="ev-note">One row per finding, with its passage, source and review state. The workspace below takes a filtered selection instead.</span></p>}
       {quoted.length>0&&<details className="gp-quoted">
-        <summary>Quoted from other papers — not counted ({quoted.length})</summary>
+        <summary>Quoted from other papers — not counted toward this marker ({quoted.length})</summary>
         <p className="ev-note">This paper repeated {quoted.length===1?'this number':'these numbers'} from work it cited. {quoted.length===1?'It is':'They are'} not {entity.name} {quoted.length===1?'evidence':'evidence'} from this study, {quoted.length===1?'counts':'count'} toward nothing on this page, and {quoted.length===1?'is':'are'} shown only so the passage is not hidden.</p>
         <ul className="gp-findings">{quoted.map(r=><li key={r.id}>
           <div className="gp-finding-head"><strong>{valueText(r)}</strong><span>{[r.target&&`for ${r.target}`,r.population].filter(Boolean).join(' · ')}</span></div>
@@ -297,7 +298,8 @@ function Card({entity,go}){
     <p>{(entity.aliases||[]).filter(a=>a!==entity.name).slice(0,3).join(' · ')||'No other names indexed'}</p>
     <div className="ev-entity-card-bottom">
       <span>{badge.text}</span>
-      {badge.kinds.length>0&&!badge.utility&&<span className="gp-card-gap">no utility finding</span>}
+      {badge.detail&&<span className="gp-card-kinds">{badge.detail}</span>}
+      {badge.total>0&&!badge.utility&&<span className="gp-card-gap">no utility finding</span>}
       <span>{entity.coverage.linked_studies} publications</span>
     </div>
   </a>;

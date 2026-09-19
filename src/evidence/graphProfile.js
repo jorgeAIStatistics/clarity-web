@@ -116,10 +116,16 @@ export function deadLetterText(d){
 
 // Graph entities the bundled catalog does not profile, filtered by the index search box and
 // ordered so pages with typed findings come before GAP pages.
+// Punctuation is not identity in a search box: "ca125", "CA-125" and "CA 125" are one query, and
+// "egfr-gene" is how the address bar spells "EGFR gene". The path is searched too, so the spelling
+// a reader copied out of the URL finds the page it came from.
+const squeeze=text=>String(text||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
 export function graphMatches(rows,query=''){
-  const q=String(query||'').trim().toLowerCase();
-  return (rows||[]).filter(e=>[e.name,e.category,...(e.aliases||[])].join(' ').toLowerCase().includes(q))
-    .sort((a,b)=>(b.coverage.quantified_outcomes-a.coverage.quantified_outcomes)||a.name.localeCompare(b.name));
+  const q=String(query||'').trim().toLowerCase(),tight=squeeze(q);
+  return (rows||[]).filter(e=>{
+    const haystack=[e.name,e.category,e.path,...(e.aliases||[])].join(' ');
+    return haystack.toLowerCase().includes(q)||(tight.length>1&&squeeze(haystack).includes(tight));
+  }).sort((a,b)=>(b.coverage.quantified_outcomes-a.coverage.quantified_outcomes)||a.name.localeCompare(b.name));
 }
 
 // ---- What the object is, and what its findings license --------------------
@@ -371,6 +377,12 @@ const statesAPopulation=text=>Boolean(String(text||'').trim())&&!VAGUE.test(Stri
 // findings: this only turns the payload's quoted list into rows a page can fold away. A finding
 // that simply does not say whose result it is stays unlabelled — silence is not a claim of
 // authorship, and badging it "primary" would invent one.
+// Only "primary" is said out loud. A sentence that never states whose result it is has told us
+// nothing, and a Primary badge on it would be an invention; silence stays silent.
+export function provenanceNote(finding={}){
+  return (finding.provenance||'unclear')==='primary'?"this paper's own result":null;
+}
+
 export function quotedRows(data){
   return (data?.quoted||[]).map(q=>({
     id:q.finding?.id,measure:q.finding?.measure,estimate:q.finding?.estimate,lower:q.finding?.lower,upper:q.finding?.upper,
@@ -531,8 +543,11 @@ export function idCaption(entity={}){
 export function kindBadge(entry={}){
   const kinds=Object.entries(entry.finding_kinds||{}).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
   const total=entry.coverage?.quantified_outcomes||kinds.reduce((sum,[,n])=>sum+n,0);
-  if(!total)return {text:'Not in this library yet',kinds:[],utility:false};
+  if(!total)return {text:'Not in this library yet',detail:null,kinds:[],utility:false,total:0};
+  // The count leads, because how much is here is the question a reader scanning a list is asking;
+  // the kinds follow, because which questions those findings answer is the next one.
   const shown=kinds.slice(0,2).map(([kind,n])=>`${n} ${kind}`);
   if(kinds.length>2)shown.push(`+${kinds.length-2} more`);
-  return {text:shown.join(' · ')||`${total} typed ${total===1?'finding':'findings'}`,kinds:kinds.map(([kind])=>kind),utility:Boolean(entry.utility_indexed)};
+  return {text:`${total} typed ${total===1?'finding':'findings'}`,detail:shown.join(' · ')||null,
+          kinds:kinds.map(([kind])=>kind),utility:Boolean(entry.utility_indexed),total};
 }

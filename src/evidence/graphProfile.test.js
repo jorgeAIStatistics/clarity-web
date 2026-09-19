@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort, catalogFreshness, quotedRows, bundledCatalog, bundledProfile } from './graphProfile.js';
+import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort, catalogFreshness, quotedRows, bundledCatalog, bundledProfile, provenanceNote } from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -251,10 +251,14 @@ test('identifiers link to the registry that issued them, and the caption says wh
 
 test('a library card says which kinds it holds and whether utility is among them', () => {
   const card = kindBadge({ coverage: { quantified_outcomes: 5 }, finding_kinds: { classification: 3, discrimination: 2 }, utility_indexed: false });
-  assert.equal(card.text, '3 classification · 2 discrimination');
+  assert.equal(card.text, '5 typed findings', 'how much is here leads');
+  assert.equal(card.detail, '3 classification · 2 discrimination', 'which questions they answer follows');
+  assert.equal(kindBadge({ coverage: { quantified_outcomes: 1 }, finding_kinds: { discrimination: 1 } }).text, '1 typed finding');
+  assert.equal(kindBadge({}).total, 0);
   assert.deepEqual([card.kinds, card.utility], [['classification', 'discrimination'], false]);
   const many = kindBadge({ coverage: { quantified_outcomes: 9 }, finding_kinds: { classification: 4, prognosis: 3, association: 1, guideline: 1 }, utility_indexed: true });
-  assert.equal(many.text, '4 classification · 3 prognosis · +2 more');
+  assert.equal(many.text, '9 typed findings');
+  assert.equal(many.detail, '4 classification · 3 prognosis · +2 more');
   assert.equal(many.utility, true);
   assert.equal(kindBadge({ coverage: { quantified_outcomes: 0 } }).text, 'Not in this library yet');
   assert.deepEqual(kindBadge({}).kinds, []);
@@ -286,6 +290,15 @@ test('the catalog leads with what can answer something, and search reaches the r
   assert.deepEqual(graphMatches(rows, '').map(r => r.name), ['CA-125', 'IL-18', 'Zonulin'], 'typed findings first');
   assert.deepEqual(graphMatches(rows, 'muc16').map(r => r.name), ['CA-125'], 'an alias finds the page');
   assert.deepEqual(graphMatches(rows, 'zonulin').map(r => r.name), ['Zonulin'], 'a page with nothing indexed is still findable');
+  // Punctuation is not identity in a search box, and the URL spelling is a thing people paste.
+  const paths = [{ name: 'EGFR gene', aliases: [], category: 'Gene', path: '/biomarkers/egfr-gene', coverage: { quantified_outcomes: 0 } },
+                 { name: 'CA-125', aliases: ['MUC16'], category: 'Molecular marker', path: '/biomarkers/ca-125', coverage: { quantified_outcomes: 7 } }];
+  assert.deepEqual(graphMatches(paths, 'egfr-gene').map(r => r.name), ['EGFR gene']);
+  assert.deepEqual(graphMatches(paths, 'EGFR gene').map(r => r.name), ['EGFR gene']);
+  assert.deepEqual(graphMatches(paths, 'ca125').map(r => r.name), ['CA-125']);
+  assert.deepEqual(graphMatches(paths, 'CA 125').map(r => r.name), ['CA-125']);
+  // A single character must not squeeze into matching everything.
+  assert.equal(graphMatches(paths, '-').length, 2, 'a bare separator is not a query');
 });
 
 test('a failed profile says which layer is down, instead of guessing at a wait', async () => {
@@ -451,4 +464,27 @@ test('the site can render its catalog with the engine entirely gone', () => {
     // A profile that is not bundled falls through rather than returning someone else's page.
     assert.equal(await bundledProfile(['biomarker:not-bundled'], ok(profiles)), null);
   })();
+});
+
+test('a quoted row sits in the fold and is absent from the counted findings', () => {
+  const payload = {
+    findings: [
+      { finding: { id: 'obs:1', kind: 'discrimination', measure: 'auc', estimate: 0.884, provenance: 'unclear' }, quote: 'AUC 0.884', pmid: '42723745' },
+      { finding: { id: 'obs:2', kind: 'prognosis', measure: 'hazard_ratio', estimate: 1.1, provenance: 'primary' }, quote: 'We found no association', pmid: '41455083' },
+    ],
+    quoted: [{ finding: { id: 'obs:q1', kind: 'effect', measure: 'risk_ratio', estimate: 1.9, marker: 'EGFR' },
+               quote: 'The RR reported by Gogishvili et al. [2022] at 1.9', pmid: '42444950' }],
+  };
+  const counted = flatten(payload.findings);
+  const fold = quotedRows(payload);
+  assert.equal(counted.length, 2, 'the header count is the linked findings only');
+  assert.equal(fold.length, 1);
+  assert.ok(!counted.some(f => f.id === 'obs:q1'), 'a quoted row must never reach the counted list');
+  assert.ok(!fold.some(r => r.id === 'obs:1'), 'and a linked row must never be filed as quoted');
+
+  // Only primary is said out loud; silence is not a claim of authorship.
+  assert.equal(provenanceNote(counted[1]), "this paper's own result");
+  assert.equal(provenanceNote(counted[0]), null);
+  assert.equal(provenanceNote({}), null);
+  assert.equal(provenanceNote({ provenance: 'cited' }), null);
 });
