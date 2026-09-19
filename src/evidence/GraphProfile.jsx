@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,quotedRows,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
+import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,quotedRows,bundledCatalog,bundledProfile,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
 import './graph-profile.css';
 
@@ -82,7 +82,12 @@ export function useGraphEntity(slug,type='biomarker',attempt=0){
       sleep:ms=>new Promise(resolve=>{waiting=setTimeout(resolve,ms);}),
       onRetry:tries=>{if(active)setState({status:'retrying',attempt:tries});},
     }).then(data=>{if(active)setState(data?{status:'ready',data}:{status:'missing'});})
-      .catch(()=>{if(active)setState({status:'error'});});
+      .catch(async()=>{
+        // Nothing answered. A few profiles are built into this site precisely for this: a first
+        // landing should be a page with Q1 on it, not a skeleton that waits for a container to boot.
+        const bundled=await bundledProfile(graphCandidates(type,slug));
+        if(active)setState(bundled?{status:'ready',data:bundled}:{status:'error'});
+      });
     return()=>{active=false;clearTimeout(waiting);inFlight?.abort();};
   },[slug,type,attempt]);
   return state;
@@ -263,11 +268,23 @@ export function useGraphBiomarkers(enabled=true){
         return response.json();
       }finally{clearTimeout(timer);}
     };
+    const settle=d=>{if(active)setState({
+      rows:(d.entries||[]).filter(e=>String(e.id).startsWith('graph:')),
+      failed:libraryIsShort(d),waking:false,published:catalogFreshness(d),
+    });};
     fetchWithRetry(once,{
       sleep:ms=>new Promise(resolve=>{waiting=setTimeout(resolve,ms);}),
       onRetry:()=>{if(active)setState(s=>({...s,waking:true}));},
-    }).then(d=>{if(active)setState({rows:(d.entries||[]).filter(e=>String(e.id).startsWith('graph:')),failed:libraryIsShort(d),waking:false,published:catalogFreshness(d)});})
-      .catch(()=>{if(active)setState({rows:null,failed:true,waking:false,published:null});});
+    }).then(settle)
+      .catch(async()=>{
+        // The engine answered nothing at all — a container that is not running has no snapshot to
+        // serve. The catalog built into this site still knows every graph profile, and showing
+        // those beats showing fourteen curated rows as though that were the library.
+        const bundled=await bundledCatalog();
+        if(!active)return;
+        if(bundled)settle(bundled);
+        else setState({rows:null,failed:true,waking:false,published:null});
+      });
     return()=>{active=false;clearTimeout(waiting);};
   },[enabled]);
   return state;

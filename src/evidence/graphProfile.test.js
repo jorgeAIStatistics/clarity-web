@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort, catalogFreshness, quotedRows } from './graphProfile.js';
+import { valueText, flatten, groupFindings, aucStrip, classificationRows, relationLabel, deadLetterText, graphMatches, objectKind, findingsCsv, findingsJson, graphPrefixes, routeTypes, EXPORT_COLUMNS, identity, biology, measurement, meaning, utility, ladder, scopeNote, questions, shouldRetry, RETRY_DELAYS, fetchWithRetry, externalLinks, idCaption, kindBadge, freshness, diagnose, ucscLink, graphPath, graphCandidates, libraryIsShort, catalogFreshness, quotedRows, bundledCatalog, bundledProfile } from './graphProfile.js';
 
 const row=(finding,extra={})=>({finding,quote:'At a cut-off of 100 ng/mL, CgA had a sensitivity of 71%.',pmid:'1',title:'SYNTHETIC',year:2024,layer:'observational',study_id:'pmid:1',...extra});
 const sens={id:'obs:1',kind:'classification',measure:'sensitivity',estimate:71,unit:'%',cutoff:100,cutoff_unit:'ng/mL',target:'neuroendocrine neoplasms',assay:'Serum CgA'};
@@ -426,4 +426,29 @@ test('quoted numbers become their own rows and are never mixed into findings', (
   assert.deepEqual(quotedRows(null), []);
   // A malformed row without an id is dropped rather than rendered as a blank entry.
   assert.deepEqual(quotedRows({ quoted: [{ finding: {}, quote: 'x' }] }), []);
+});
+
+test('the site can render its catalog with the engine entirely gone', () => {
+  // A container that is not running answers nothing, so no server-side snapshot reaches the page.
+  // These files ship inside the site and are always labelled as published copies.
+  const ok = body => async () => ({ ok: true, json: async () => body });
+  return (async () => {
+    const catalog = await bundledCatalog(ok({ entries: [{ id: 'graph:biomarker:il-18' }, { id: 'entity:apob' }], graph_rows: 138, generated_at: '2026-09-19T19:14:18Z' }));
+    assert.equal(catalog.served_from, 'snapshot', 'a bundled catalog is never presented as live');
+    assert.equal(catalog.entries.length, 2);
+    assert.equal(libraryIsShort(catalog), false, '138 graph rows is not a short read');
+
+    // An empty or missing file is not a catalog: better to say the read failed than to show nothing.
+    assert.equal(await bundledCatalog(ok({ entries: [] })), null);
+    assert.equal(await bundledCatalog(async () => ({ ok: false })), null);
+    assert.equal(await bundledCatalog(async () => { throw new TypeError('offline'); }), null);
+
+    const profiles = { entities: { 'biomarker:il-18': { entity: { id: 'biomarker:il-18', name: 'IL-18' }, findings: [1, 2] } }, published_at: '2026-09-19T19:14:18Z' };
+    const hit = await bundledProfile(['gene:il-18', 'biomarker:il-18'], ok(profiles));
+    assert.equal(hit.entity.name, 'IL-18');
+    assert.equal(hit.served_from, 'snapshot');
+    assert.match(freshness(hit), /Published 2026-09-19/, 'and the page says so');
+    // A profile that is not bundled falls through rather than returning someone else's page.
+    assert.equal(await bundledProfile(['biomarker:not-bundled'], ok(profiles)), null);
+  })();
 });

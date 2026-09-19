@@ -432,6 +432,32 @@ export function catalogFreshness(payload){
   return `Catalog published ${at||'earlier'}. The live evidence graph did not answer in time, so this list may be short of nodes added since.`;
 }
 
+// Files built into the site itself, served from this origin. The engine's own snapshot covers a
+// cold process; it cannot cover a container that is not running, which answers nothing at all and
+// is what leaves the index showing its fourteen curated rows. These are the last resort, and they
+// are always labelled as published copies, never passed off as live.
+export async function bundledCatalog(request=fetch){
+  try{
+    const response=await request('/library.json');
+    if(!response.ok)return null;
+    const data=await response.json();
+    return Array.isArray(data?.entries)&&data.entries.length?{...data,served_from:'snapshot'}:null;
+  }catch{return null;}
+}
+
+export async function bundledProfile(candidates,request=fetch){
+  try{
+    const response=await request('/graph-profiles.json');
+    if(!response.ok)return null;
+    const data=await response.json();
+    for(const id of candidates){
+      const profile=(data?.entities||{})[id];
+      if(profile)return {...profile,served_from:'snapshot',published_at:data.published_at||null};
+    }
+    return null;
+  }catch{return null;}
+}
+
 export const RETRY_DELAYS=[1500,4000];
 export function shouldRetry(outcome){
   if(outcome==='network')return true;
