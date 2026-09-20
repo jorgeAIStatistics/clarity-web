@@ -15,7 +15,7 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1px;
-  margin: 0 0 28px;
+  margin: 0 0 22px;
   padding: 0;
   list-style: none;
   background: var(--line);
@@ -32,11 +32,12 @@
   background: var(--panel);
   color: var(--text-2) !important;
   text-decoration: none !important;
-  min-height: 58px;
+  min-height: 54px;
 }
 
 .gp-command a:hover {
   background: var(--panel-hover);
+  text-decoration: none !important;
 }
 
 .gp-command em {
@@ -54,7 +55,7 @@
 
 .gp-identity {
   display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1px !important;
   margin: 22px 0 0 !important;
   background: var(--line);
@@ -87,6 +88,7 @@
 }
 
 .gp-identity .gp-stat dd {
+  font-family: var(--font-mono);
   font-size: 22px;
   font-weight: 550;
   letter-spacing: -0.03em;
@@ -133,6 +135,7 @@
 .gp-q {
   border-top: 1px solid var(--line);
   padding-top: 28px;
+  scroll-margin-top: calc(var(--header-h) + 42px + 64px);
 }
 
 .gp-q > h2 {
@@ -142,10 +145,12 @@
 }
 
 .gp-q > h2 em {
+  font-family: var(--font-mono);
+  font-style: normal;
   background: transparent;
   color: var(--signal);
   border: 1px solid color-mix(in srgb, var(--signal) 40%, var(--line));
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 4px 7px;
 }
 
@@ -166,21 +171,41 @@
   border-color: var(--line);
 }
 
+.gp-section-head h2 {
+  font-family: var(--font-display);
+  font-weight: 520;
+  letter-spacing: -0.03em;
+}
+
 @media (max-width: 900px) {
-  .gp-command,
   .gp-identity,
   .gp-ladder {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   .gp-command {
-    top: var(--header-h);
+    display: flex;
+    overflow-x: auto;
+    grid-template-columns: none;
+    scrollbar-width: none;
+  }
+  .gp-command::-webkit-scrollbar {
+    display: none;
+  }
+  .gp-command a {
+    flex: 0 0 132px;
+    min-height: 52px;
   }
 }
 
 @media (max-width: 600px) {
-  .gp-command,
   .gp-identity,
   .gp-ladder {
     grid-template-columns: 1fr !important;
+  }
+  .gp-q {
+    scroll-margin-top: calc(var(--header-h) + 42px + 56px);
+  }
+  .gp-q > h2 {
+    font-size: 22px;
   }
 }

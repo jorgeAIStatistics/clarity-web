@@ -3,6 +3,7 @@ import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
 import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,quotedRows,provenanceNote,bundledCatalog,bundledProfile,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
+import GraphCommand from './GraphCommand.jsx';
 import './graph-profile.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
@@ -19,8 +20,8 @@ function AucStrip({strip}){
     </g>)}
     {strip.points.map((p,i)=>{const y=TOP+i*ROW+ROW/2;const name=p.measure==='auc'?'AUC':'C-index';return <g key={p.id}>
       <text x={L-14} y={y+4} textAnchor="end" fontSize="11.5" fill="currentColor">{clip(p.label,34)}</text>
-      {p.lower!=null&&p.upper!=null&&<line x1={x(p.lower)} x2={x(p.upper)} y1={y} y2={y} stroke="#34e0be" strokeWidth="2" strokeLinecap="round"/>}
-      <circle cx={x(p.estimate)} cy={y} r="5" fill="#34e0be" stroke="#0a0d14" strokeWidth="2"><title>{`${name} ${p.estimate}${p.lower!=null&&p.upper!=null?` (${p.lower} to ${p.upper})`:''} · ${p.label}`}</title></circle>
+      {p.lower!=null&&p.upper!=null&&<line x1={x(p.lower)} x2={x(p.upper)} y1={y} y2={y} stroke="#3ee0c4" strokeWidth="2" strokeLinecap="round"/>}
+      <circle cx={x(p.estimate)} cy={y} r="5" fill="#3ee0c4" stroke="#0a0d14" strokeWidth="2"><title>{`${name} ${p.estimate}${p.lower!=null&&p.upper!=null?` (${p.lower} to ${p.upper})`:''} · ${p.label}`}</title></circle>
     </g>;})}
   </svg>;
 }
@@ -135,7 +136,7 @@ export default function GraphProfile({slug,go,type='biomarker'}){
   const [attempt,setAttempt]=useState(0);
   const state=useGraphEntity(slug,type,attempt);
 
-  if(state.status==='loading'||state.status==='retrying')return <div className="gp" aria-busy="true"><div className="ev-hero"><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><div className="gp-skeleton gp-skeleton-title"/><div className="gp-skeleton"/></div><ul className="gp-layers" aria-hidden="true">{LAYERS.map(l=><li key={l} className="gp-layer gp-layer-skeleton"/>)}</ul><p className="ev-note" role="status">{state.status==='retrying'?'The evidence engine is waking up. Retrying…':'Loading the graph profile…'}</p></div>;
+  if(state.status==='loading'||state.status==='retrying')return <div className="gp gp-command-page" aria-busy="true"><div className="ev-hero"><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><div className="gp-skeleton gp-skeleton-title"/><div className="gp-skeleton"/></div><GraphCommand /><p className="ev-note" role="status">{state.status==='retrying'?'The evidence engine is waking up. Retrying…':'Loading the graph profile…'}</p></div>;
   if(state.status==='missing')return <div className="gp"><Hero name="Page not found" go={go} type={type}/><section className="ev-panel"><h2>This evidence page does not exist</h2><p>No biomarker in the Clarity graph uses this address.</p><Link to="/biomarkers" go={go}>Return to biomarkers</Link></section></div>;
   if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><Diagnosis/><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
 
@@ -149,17 +150,18 @@ export default function GraphProfile({slug,go,type='biomarker'}){
     const link=Object.assign(document.createElement('a'),{href:url,download:`${entity.id.replace(':','-')}-findings.${extension}`});
     document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
-  return <div className="gp">
+  return <div className="gp gp-command-page">
     <Hero name={entity.name} go={go} type={type}>
       {stale&&<p className="gp-stale" role="status">{stale}</p>}
       <p className="ev-intro">{q1.text}{q1.specimen?` Measured in ${q1.specimen.toLowerCase()}.`:''} This page answers five questions in order, from what the object is to whether measuring it helps, using only findings indexed in the graph.</p>
       <dl className="gp-identity">
         {q1.aliases.length>0&&<div><dt>Also written as</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
-        <div><dt>Linked publications</dt><dd>{studies}</dd></div>
-        <div><dt>Typed findings</dt><dd>{total}</dd></div>
-        {quoted.length>0&&<div><dt>Quoted, not counted</dt><dd>{quoted.length}</dd></div>}
+        <div className="gp-stat"><dt>Linked publications</dt><dd>{studies}</dd></div>
+        <div className="gp-stat"><dt>Typed findings</dt><dd>{total}</dd></div>
+        {quoted.length>0&&<div className="gp-stat"><dt>Quoted, not counted</dt><dd>{quoted.length}</dd></div>}
       </dl>
     </Hero>
+    <GraphCommand />
 
     <section className="gp-section" aria-labelledby="gp-ladder-title">
       <div className="gp-section-head"><h2 id="gp-ladder-title">How far the evidence goes</h2><p className="ev-note">A rung is indexed only when a finding in this graph speaks to it. Not indexed means Clarity holds nothing, not that nothing exists.</p></div>

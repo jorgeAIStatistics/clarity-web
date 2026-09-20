@@ -31,3 +31,10 @@ This folder is the visual contract for Clarity as a biomedical research intellig
 ## Surfaces still outside this PR
 
 Compound `/compound/:slug` report chrome, comparison columns, learn/methodology longform, and the visual-profile studio keep their existing CSS. Later phases should migrate them onto these tokens rather than inventing a second palette.
+
+## Mounts landed on this branch
+
+- Graph entity pages render `<GraphCommand />` immediately after the Hero (including the loading state).
+- Homepage / Learn `GuideTopBar` is a `.cl-shell` header with the shared command search.
+- Explorer `.ev-header` uses the same brand, search, and signal nav. `?q=` seeds the library filter; `/` focuses `#cl-command-search`.
+

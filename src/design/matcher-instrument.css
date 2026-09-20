@@ -1,45 +1,111 @@
-/* Matcher and findings workspace as a research bench, not a form wizard. */
+/* Matcher and findings workspace as a research bench, not a form wizard.
+   Loaded before questionMap.css; beat it with .qm-instrument .qm specificity. */
 
 .qm-instrument {
   min-width: 0;
 }
 
-.qm,
-.question-map,
-[class^="qm-"] {
-  --qm-ink: var(--ink);
+.qm-instrument .qm,
+.qm-instrument .question-map {
+  --qm-ink: var(--text);
+  --qm-soft: var(--text-2);
+  --qm-muted: var(--mute);
+  --qm-line: var(--line);
+  --qm-panel: var(--panel);
+  --qm-teal: var(--signal);
+  color: var(--text);
+  font-family: var(--font-sans);
+  max-width: var(--page-wide);
 }
 
-.qm-panel,
-.qm-workspace-panel {
+.qm-instrument .qm h2 {
+  font-family: var(--font-display);
+  font-weight: 520;
+  letter-spacing: -0.03em;
+}
+
+.qm-instrument .qm a {
+  color: var(--signal);
+}
+
+.qm-instrument .qm-panel,
+.qm-instrument .qm-workspace-panel,
+.qm-instrument .qm-preview > div,
+.qm-instrument .qm-entity-brief,
+.qm-instrument .qm-skeleton {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.qm-instrument .qm-panel {
   padding: 22px 22px 20px;
 }
 
-.qm-panel-head {
+.qm-instrument .qm-panel-head {
   display: flex;
   align-items: baseline;
   gap: 12px;
 }
 
-.qm-letter {
+.qm-instrument .qm-letter {
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--signal-ink);
   background: var(--signal);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 4px 6px;
 }
 
-.qm-workspace-table {
+.qm-instrument .qm-button,
+.qm-instrument .qm button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.qm-instrument .qm .qm-primary {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--signal-ink);
+}
+
+.qm-instrument .qm .qm-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--signal) 82%, white);
+  border-color: color-mix(in srgb, var(--signal) 82%, white);
+}
+
+.qm-instrument .qm textarea,
+.qm-instrument .qm input:not([type="checkbox"]):not([type="file"]),
+.qm-instrument .qm select {
+  background: var(--ink-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.qm-instrument .qm-drop {
+  background: var(--ink-raised);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.qm-instrument .qm-intents li {
+  border-radius: var(--radius-sm);
+  background: var(--ink-raised);
+  border-color: var(--line);
+}
+
+.qm-instrument .qm-workspace-table {
   font-variant-numeric: tabular-nums;
   font-size: 13px;
 }
 
-.qm-workspace-table th {
+.qm-instrument .qm-workspace-table th,
+.qm-instrument .qm .qm-workspace-table thead th {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
@@ -48,23 +114,34 @@
   background: var(--ink-raised);
 }
 
-.qm-workspace-table tbody tr:hover {
+.qm-instrument .qm-workspace-table tbody tr:hover {
   background: var(--panel-hover);
 }
 
-.qm-facets button[aria-pressed="true"] {
+.qm-instrument .qm-facets fieldset button[aria-pressed="true"] {
   border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 10%, var(--panel));
   color: var(--signal);
 }
 
-.qm-back {
+.qm-instrument .qm-forest figcaption strong,
+.qm-instrument .qm-pred figcaption strong {
+  color: var(--signal);
+}
+
+.qm-instrument .qm-back {
   font-size: 13px;
   margin: 16px 0;
 }
 
+.qm-instrument .qm :is(a, button, summary, select, input, textarea):focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+}
+
 @media (max-width: 700px) {
-  .qm-panel,
-  .qm-workspace-panel {
+  .qm-instrument .qm-panel,
+  .qm-instrument .qm-workspace-panel {
     padding: 16px;
   }
 }

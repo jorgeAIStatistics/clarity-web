@@ -2366,13 +2366,11 @@ function ProfileView({view,onLearn}) {
 
 function GuideLanguageToggle({ langState }) {
   return (
-    <div style={{ display: "flex", gap: 4, padding: 3, borderRadius: 10, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.025)" }}>
+    <div className="cl-lang" role="group" aria-label={langState[0]==="es"?"Idioma":"Language"}>
       {[["en", "EN"], ["es", "ES"]].map(([code, label]) => (
-        <motion.button key={code} whileTap={{ scale: 0.94 }} onClick={() => langState[1](code)} style={{ border: "none", cursor: "pointer", padding: "5px 9px", borderRadius: 7, fontFamily: MONO, fontSize: 10.5, fontWeight: 700, position:"relative", overflow:"hidden",
-          color: langState[0] === code ? INK : MUTE, background: "transparent" }}>
-          {langState[0] === code ? <motion.span layoutId="guide-language-active" transition={MOTION_SPRING} style={{ position:"absolute", inset:0, borderRadius:7, background:TEAL, zIndex:0 }} /> : null}
-          <span style={{ position:"relative", zIndex:1 }}>{label}</span>
-        </motion.button>
+        <button key={code} type="button" aria-pressed={langState[0] === code} onClick={() => langState[1](code)}>
+          {label}
+        </button>
       ))}
     </div>
   );
@@ -2385,26 +2383,43 @@ function TopNavLinks({ active, onHome, onResearch, onLearn, lang="en" }) {
     ["research",es?"Intervenciones":"Interventions",onResearch],
     ["learn",es?"Aprender":"Learn",onLearn],
   ];
-  return <nav className="desktop-top-nav" aria-label={es?"Navegación principal":"Primary navigation"} style={{display:"flex",alignItems:"center",gap:4}}>
-    <a href="/explore" style={{color:MUTE,fontSize:11.5,padding:"7px 10px",textDecoration:"none"}}>{es?"Explorar":"Explore"}</a><a href="/explore/matcher" style={{color:TEAL,fontSize:11.5,padding:"7px 10px",textDecoration:"none"}}>{es?"Mi investigación":"Connect my research"}</a>
-    {items.map(([k,label,fn])=><button key={k} onClick={()=>fn?.()} aria-current={active===k?"page":undefined} style={{border:0,background:"transparent",cursor:"pointer",padding:"7px 10px",borderRadius:8,color:active===k?TEAL:MUTE,fontSize:11.5,fontWeight:active===k?650:500,borderBottom:`1px solid ${active===k?TEAL:"transparent"}`}}>{label}</button>)}
+  return <nav className="cl-nav desktop-top-nav" aria-label={es?"Navegación principal":"Primary navigation"}>
+    <a href="/explore">{es?"Explorar":"Explore"}</a>
+    <a href="/explore/matcher" className="cl-nav-signal">{es?"Mi investigación":"Connect my research"}</a>
+    {items.map(([k,label,fn])=><button key={k} type="button" className={k==="home"?undefined:"cl-nav-optional"} onClick={()=>fn?.()} aria-current={active===k?"page":undefined}>{label}</button>)}
   </nav>;
 }
 
 function GuideTopBar({ langState, onResearch, onHome, onLearn, active="home" }) {
   const c = guideCopy(langState[0]);
+  const es = langState[0]==="es";
+  const searchRef = useRef(null);
+  useEffect(()=>{
+    const onKey=e=>{
+      if(e.key==="/"&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)){
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown",onKey);
+    return ()=>window.removeEventListener("keydown",onKey);
+  },[]);
   return (
-    <motion.div initial={{ opacity:0, y:-10 }} animate={{ opacity:1, y:0 }} transition={{ duration:.4, ease:MOTION_EASE }} style={{ height: 54, borderBottom: `1px solid ${LINE}`, padding: "0 22px", display: "flex", alignItems: "center", gap: 11, position: "sticky", top: 0, background: `${INK}F3`, backdropFilter: "blur(10px)", zIndex: 30 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-        <div style={{ width: 27, height: 27, borderRadius: 8, background: `linear-gradient(135deg,${TEAL},${TEAL_DIM})`, display: "grid", placeItems: "center" }}><Activity size={15} color={INK} strokeWidth={2.6}/></div>
-        <span style={{ fontWeight: 800, letterSpacing: -0.4, fontSize: 16 }}>Clarity</span>
-        <span className="guide-tagline" style={{ paddingLeft: 11, borderLeft: `1px solid ${LINE}`, fontSize: 12, color: MUTE }}>{c.top_tagline}</span>
-      </div>
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-        <TopNavLinks active={active} onHome={onHome} onResearch={()=>onResearch?.(null,null)} onLearn={()=>onLearn?.("basics")} lang={langState[0]} />
-        <GuideLanguageToggle langState={langState} />
-      </div>
-    </motion.div>
+    <header className="cl-shell">
+      <a className="cl-brand" href="/" onClick={(e)=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();onHome?.();}}}>
+        <span className="cl-mark" aria-hidden="true"><Activity size={14} color="#3ee0c4" strokeWidth={2.4}/></span>
+        <span className="cl-brand-name">Clarity</span>
+        <span className="cl-brand-rule" aria-hidden="true" />
+        <span className="cl-kicker">{c.top_tagline}</span>
+      </a>
+      <form className="cl-search" role="search" action="/explore" method="get">
+        <Search size={14} aria-hidden="true"/>
+        <input ref={searchRef} id="cl-command-search" type="search" name="q" placeholder="ApoB, IL-18, EGFR…" aria-label={es?"Buscar perfiles de evidencia":"Search evidence profiles"} />
+        <kbd>/</kbd>
+      </form>
+      <TopNavLinks active={active} onHome={onHome} onResearch={()=>onResearch?.(null,null)} onLearn={()=>onLearn?.("basics")} lang={langState[0]} />
+      <GuideLanguageToggle langState={langState} />
+    </header>
   );
 }
 
@@ -2472,7 +2487,7 @@ function GoalExploreCard({ goal, copy, onResearch, reduceMotion, gradeVersion })
 }
 
 function HomePage({langState,onResearch,onLearn,onHome}) {
-  return <div style={{background:INK,minHeight:"100vh",color:TEXT}}><GuideTopBar langState={langState} onResearch={onResearch} onHome={onHome} onLearn={onLearn} active="home"/><PlatformHome/></div>;
+  return <div className="cl-home"><GuideTopBar langState={langState} onResearch={onResearch} onHome={onHome} onLearn={onLearn} active="home"/><PlatformHome/></div>;
 }
 
 function LearnPage({ langState, initialSection, onResearch, onHome, onLearn }) {
