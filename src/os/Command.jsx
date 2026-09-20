@@ -122,6 +122,10 @@ export default function Command({open, onClose, entries, go, seed = '', defaultM
                   <p>{current.summary || ''}</p>
                   {current.derived && <p className="os-warn">Derived identity view. Not a graph node. Findings are not copied onto it.</p>}
                   <p className="os-cmd-note">{current.derived ? 'No protein-level findings are claimed here.' : `${current.coverage.linked_studies || 0} publications · ${current.coverage.quantified_outcomes || 0} outcomes with estimates. Counts are coverage, not grades.`}</p>
+                  <div className="os-actions">
+                    <button className="os-primary" type="button" onClick={() => run(current)}>Open entity</button>
+                    <button className="os-ghost" type="button" onClick={() => { go(`/graph?focus=${encodeURIComponent(current.id)}`); onClose(); }}>Open graph</button>
+                  </div>
                 </>
               ) : (
                 <p className="os-note">Entity search returns typed objects. EGFR the gene is not eGFR the filtration estimate. IL18 the gene is not IL-18 the circulating measurement.</p>

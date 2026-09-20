@@ -28,6 +28,10 @@ export default function WorkspaceHome({go}) {
           {store.studies.length ? store.studies.map(s => (
             <a key={s.id} href={`https://pubmed.ncbi.nlm.nih.gov/${s.pmid}/`} target="_blank" rel="noreferrer" style={{display: 'block', padding: '8px 0', borderBottom: '1px solid var(--line)'}}>{s.title || s.id}<small className="os-note" style={{display: 'block'}}>PMID {s.pmid}</small></a>
           )) : <p className="os-note">Inspect a finding and save its study.</p>}
+          <h2 style={{marginTop: 28}}>Pinned graph paths</h2>
+          {store.paths?.length ? store.paths.map(p => (
+            <a key={p.id} href="/graph" onClick={e => { e.preventDefault(); go(p.hops?.[0] ? `/graph?focus=${encodeURIComponent(p.hops[0].from.id)}` : '/graph'); }} style={{display: 'block', padding: '8px 0', borderBottom: '1px solid var(--line)'}}>{p.name}<small className="os-note" style={{display: 'block'}}>{p.hops?.length || 0} hop{(p.hops?.length || 0) === 1 ? '' : 's'} · this browser</small></a>
+          )) : <p className="os-note">Pin a walk from the graph environment.</p>}
           <h2 style={{marginTop: 28}}>Comparisons</h2>
           {store.comparisons.length ? store.comparisons.map(c => (
             <a key={c.id} href="/compare" onClick={e => { e.preventDefault(); go('/compare'); }} style={{display: 'block', padding: '8px 0'}}>{c.ids.join(' vs ')}</a>

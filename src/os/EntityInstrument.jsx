@@ -61,6 +61,7 @@ export default function EntityInstrument({kind, slug, go}) {
   const isPinned = loadOsStore().pins.some(p => p.id === entity.id || p.path === ident.path);
   const graphBacked = origin === 'live' || origin === 'snapshot';
   const derived = origin === 'derived';
+  const showBiomarkerFigures = usesBiomarkerContract(kind) && rows.length > 0;
   const showEvidenceChrome = graphBacked || rows.length > 0;
 
   function download(text, mime, ext) {
@@ -410,6 +411,7 @@ function InterventionInstrument({slug, graph, go}) {
             const next = togglePin({id: ident.id, name, kind: 'intervention', path: ident.path});
             setPinned(next.pins.some(p => p.id === ident.id));
           }}>{pinned ? 'Pinned' : 'Pin'}</button>
+          <button className="os-ghost" type="button" onClick={() => go(`/graph?focus=${encodeURIComponent(ident.id)}`)}>Graph</button>
           <button className="os-ghost" type="button" onClick={() => go(`/explore/compare?profile=${encodeURIComponent(visualExtractId(ident))}`)}>Compare</button>
           <button className="os-ghost" type="button" onClick={() => go(`/investigate?evidence=${encodeURIComponent(name)}`)}>Investigate</button>
         </div>

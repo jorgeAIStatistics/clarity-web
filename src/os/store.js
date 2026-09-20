@@ -13,9 +13,11 @@ function read() {
       comparisons: Array.isArray(raw.comparisons) ? raw.comparisons : [],
       figures: Array.isArray(raw.figures) ? raw.figures : [],
       studies: Array.isArray(raw.studies) ? raw.studies : [],
+      paths: Array.isArray(raw.paths) ? raw.paths : [],
+      lastGraphFocus: raw.lastGraphFocus || null,
     };
   } catch {
-    return {recents: [], pins: [], collections: [], comparisons: [], figures: [], studies: []};
+    return {recents: [], pins: [], collections: [], comparisons: [], figures: [], studies: [], paths: [], lastGraphFocus: null};
   }
 }
 
@@ -47,6 +49,13 @@ export function rememberEntity(entry) {
   return write(state);
 }
 
+export function rememberLastGraphFocus(entry) {
+  if (!entry?.id) return read();
+  const state = read();
+  state.lastGraphFocus = {...entry, at: new Date().toISOString()};
+  return write(state);
+}
+
 export function togglePin(entry) {
   const state = read();
   const exists = state.pins.some(x => sameIdentity(itemKey(x), itemKey(entry)));
@@ -68,6 +77,18 @@ export function pinStudy(study) {
 export function saveComparison(ids) {
   const state = read();
   state.comparisons = [{id: ids.join('|'), ids, at: new Date().toISOString()}, ...state.comparisons].slice(0, 12);
+  return write(state);
+}
+
+export function savePinnedPath(path) {
+  const state = read();
+  const item = {
+    id: path.id || `path:${Date.now()}`,
+    name: path.name,
+    hops: path.hops || [],
+    at: new Date().toISOString(),
+  };
+  state.paths = [item, ...(state.paths || []).filter(p => p.id !== item.id)].slice(0, 20);
   return write(state);
 }
 

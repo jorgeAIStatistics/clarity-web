@@ -1,15 +1,14 @@
 import React, {lazy, Suspense, useCallback, useEffect, useState} from 'react';
 import {canonicalPath} from '../platform/routes.js';
-import {parseOsPath, titleForRoute, osPathFromId} from './routes.js';
+import {parseOsPath, titleForRoute} from './routes.js';
 import {useLibrary} from './data.js';
 import Command from './Command.jsx';
 import Workbench from './Workbench.jsx';
 import Catalog from './Catalog.jsx';
 import WorkspaceHome from './WorkspaceHome.jsx';
 import EntityInstrument from './EntityInstrument.jsx';
-import GraphNeighborhood from './GraphNeighborhood.jsx';
+import GraphEnv from './GraphEnv.jsx';
 import Methods from './Methods.jsx';
-import {useOsEntity} from './data.js';
 import './os.css';
 
 const EvidenceMatcher = lazy(() => import('../platform/EvidenceMatcher.jsx'));
@@ -99,7 +98,7 @@ export default function OsApp() {
         {nav === 'workspace' && <WorkspaceHome go={go} />}
         {nav === 'catalog' && <Catalog key={`${route.type}|${route.q}`} entries={lib.entries} go={go} initialType={route.type} initialQuery={route.q} />}
         {nav === 'entity' && <EntityInstrument key={`${route.kind}:${route.slug}`} kind={route.kind} slug={route.slug} go={go} />}
-        {nav === 'graph' && <GraphScreen focus={route.focus} go={go} />}
+        {nav === 'graph' && <GraphEnv focus={route.focus} go={go} />}
         {nav === 'investigate' && (
           <Suspense fallback={<p className="os-status">Loading investigation…</p>}>
             <div className="os-work">
@@ -121,25 +120,6 @@ export default function OsApp() {
         )}
       </div>
       <Command open={cmd} onClose={() => setCmd(false)} entries={lib.entries} go={go} defaultMode={cmdMode} />
-    </div>
-  );
-}
-
-function GraphScreen({focus, go}) {
-  const [kind, slug] = String(focus || 'precision_context:ret-selpercatinib').split(':');
-  const mappedKind = kind === 'compound' ? 'intervention' : kind === 'precision_context' ? 'precision_context' : kind;
-  const state = useOsEntity(mappedKind, slug || 'ret-selpercatinib');
-  if (state.status === 'loading') return <p className="os-status">Loading neighborhood…</p>;
-  if (!state.data?.entity) return <main className="os-work"><h1>No graph payload</h1><p>Open an entity first, then use Graph on its instrument.</p></main>;
-  const e = state.data.entity;
-  return (
-    <div className="os-graph-page">
-      <div className="os-graph-toolbar">
-        <p className="os-eyebrow">Graph environment · 1-hop</p>
-        <strong>{e.name}</strong>
-        <button className="os-ghost" type="button" onClick={() => go(osPathFromId(e.id))}>Instrument</button>
-      </div>
-      <GraphNeighborhood focus={{id: e.id, name: e.name, kind: e.kind}} related={state.data.related || []} go={go} height={640} />
     </div>
   );
 }

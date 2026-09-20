@@ -74,6 +74,74 @@ export function useOsEntity(kind, slug) {
   return state;
 }
 
+// Graph environment: paint a published snapshot as soon as it exists, while the
+// live query is still in flight. Snapshot is labeled. Live replaces it if it answers.
+export function useGraphNeighborhood(kind, slug) {
+  const [state, setState] = useState({status: 'querying', query: 'querying', data: null, livePending: true});
+  useEffect(() => {
+    if (!kind || !slug) { setState({status: 'missing', query: 'missing', data: null, livePending: false}); return undefined; }
+    const ident = identityFromKindSlug(kind, slug);
+    const ids = candidateIds(kind, slug);
+    let cancelled = false;
+    let liveResolved = false;
+    setState({
+      status: 'querying',
+      query: 'querying',
+      data: {entity: {id: ident.id, name: slug, kind, type: kind}, related: [], findings: [], studies: null},
+      source: null,
+      livePending: true,
+      requested: ident.id,
+    });
+
+    bundledProfile(ids).then(bundled => {
+      if (cancelled || liveResolved || !bundled) return;
+      setState({
+        status: 'ready',
+        query: 'querying',
+        data: withOrigin(bundled, 'snapshot', ident),
+        source: 'snapshot',
+        livePending: true,
+        requested: ident.id,
+      });
+    }).catch(() => {});
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    (async () => {
+      try {
+        for (const id of ids) {
+          const r = await fetch(`${API_BASE}/api/evidence/graph/entity/${encodeURIComponent(id)}`, {signal: controller.signal});
+          if (r.status === 404) continue;
+          if (!r.ok) throw Object.assign(Error('fail'), {outcome: r.status});
+          return {data: await r.json(), source: 'live'};
+        }
+        return null;
+      } finally { clearTimeout(timer); }
+    })()
+      .then(async hit => {
+        if (cancelled) return;
+        if (hit?.data) {
+          liveResolved = true;
+          setState({status: 'ready', query: 'live', data: withOrigin(hit.data, 'live', ident), source: 'live', livePending: false, requested: ident.id});
+          return;
+        }
+        const resolved = await resolveOffline(ids, kind, slug, ident);
+        if (cancelled) return;
+        if (resolved) setState({status: 'ready', query: resolved.source, ...resolved, livePending: false, requested: ident.id});
+        else setState({status: 'missing', query: 'missing', data: null, livePending: false, requested: ident.id});
+      })
+      .catch(async () => {
+        const resolved = await resolveOffline(ids, kind, slug, ident);
+        if (cancelled) return;
+        if (resolved) setState({status: 'ready', query: resolved.source, ...resolved, livePending: false, requested: ident.id});
+        else setState({status: 'error', query: 'missing', data: null, livePending: false});
+      });
+
+    return () => { cancelled = true; controller.abort(); };
+  }, [kind, slug]);
+  return state;
+}
+
 function withOrigin(data, source, ident) {
   const entity = data?.entity ? {...data.entity, id: canonicalId(data.entity.id) || ident.id} : data?.entity;
   return {
@@ -134,8 +202,8 @@ async function deriveProtein(slug) {
     findings: [],
     quoted: [],
     related: [
-      geneId ? {edge: 'ENCODED_BY', id: geneId, name: geneRel?.name || `${e.locus?.gene_symbol} gene`, kind: 'Gene', outgoing: true} : null,
-      {edge: 'RELATED_TO', reason: 'measures', id: e.id, name: e.name, kind: 'Biomarker', outgoing: true},
+      geneId ? {edge: 'ENCODED_BY', id: geneId, name: geneRel?.name || `${e.locus?.gene_symbol} gene`, kind: 'Gene', outgoing: true, origin: 'derived'} : null,
+      {edge: 'RELATED_TO', reason: 'measures', id: e.id, name: e.name, kind: 'Biomarker', outgoing: true, origin: 'derived'},
     ].filter(Boolean),
     studies: 0,
     dead_letters: [],
