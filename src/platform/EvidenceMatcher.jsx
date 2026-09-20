@@ -1,5 +1,6 @@
 import React from 'react';
 import QuestionMap from '../research/QuestionMap.jsx';
+import '../design/matcher-instrument.css';
 const Workspace = React.lazy(() => import('../research/Workspace.jsx'));
 
 // The question map is the landing view; the row-level study workspace stays one link away.
