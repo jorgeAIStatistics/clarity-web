@@ -95,6 +95,7 @@
 }
 
 .gp-ladder {
+  display: grid !important;
   grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
   gap: 1px !important;
   background: var(--line);
@@ -175,6 +176,13 @@
   font-family: var(--font-display);
   font-weight: 520;
   letter-spacing: -0.03em;
+}
+
+@media (max-width: 1100px) {
+  .gp ol.gp-ladder,
+  .gp-ladder {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
 }
 
 @media (max-width: 900px) {

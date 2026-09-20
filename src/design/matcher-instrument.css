@@ -19,7 +19,7 @@
 }
 
 .qm-instrument .qm h2 {
-  font-family: var(--font-display);
+  font-family: var(--font-display) !important;
   font-weight: 520;
   letter-spacing: -0.03em;
 }
