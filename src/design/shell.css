@@ -82,6 +82,21 @@ header.ev-header nav,
   flex: none;
 }
 
+header.cl-shell .cl-nav,
+header.cl-shell nav.desktop-top-nav {
+  display: flex !important;
+}
+
+.page-with-mobile-dock:has(.cl-home) + .mobile-bottom-nav,
+.page-with-mobile-dock:has(.ev) + .mobile-bottom-nav {
+  display: none !important;
+}
+
+.page-with-mobile-dock:has(.cl-home),
+.page-with-mobile-dock:has(.ev) {
+  padding-bottom: 24px !important;
+}
+
 .cl-nav a,
 .cl-nav button,
 header.ev-header nav a,
