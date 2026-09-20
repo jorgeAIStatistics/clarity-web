@@ -1,0 +1,219 @@
+/* Graph entity chrome: identity rail, Q-ladder pipeline, command navigation. */
+
+.gp {
+  --gp-accent: var(--signal);
+}
+
+.gp-command-page {
+  padding-bottom: 48px;
+}
+
+.gp-command {
+  position: sticky;
+  top: calc(var(--header-h) + 42px);
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.gp-command a {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--panel);
+  color: var(--text-2) !important;
+  text-decoration: none !important;
+  min-height: 54px;
+}
+
+.gp-command a:hover {
+  background: var(--panel-hover);
+  text-decoration: none !important;
+}
+
+.gp-command em {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--signal);
+}
+
+.gp-command span {
+  font-size: 12.5px;
+  color: var(--mute);
+}
+
+.gp-identity {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px !important;
+  margin: 22px 0 0 !important;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.gp-identity > div {
+  background: var(--panel);
+  padding: 14px 16px;
+  max-width: none !important;
+}
+
+.gp-identity dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.gp-identity dd {
+  margin: 6px 0 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.gp-identity .gp-stat dd {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 550;
+  letter-spacing: -0.03em;
+}
+
+.gp-ladder {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 1px !important;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.gp-ladder li {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--panel) !important;
+  padding: 14px 14px 16px !important;
+  position: relative;
+}
+
+.gp-ladder li[data-indexed="true"] {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--signal) 10%, transparent), transparent),
+    var(--panel) !important;
+}
+
+.gp-ladder li[data-indexed="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--signal);
+}
+
+.gp-ladder li[data-indexed="false"] {
+  opacity: 0.78;
+  background: var(--ink-raised) !important;
+}
+
+.gp-q {
+  border-top: 1px solid var(--line);
+  padding-top: 28px;
+  scroll-margin-top: calc(var(--header-h) + 42px + 64px);
+}
+
+.gp-q > h2 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+
+.gp-q > h2 em {
+  font-family: var(--font-mono);
+  font-style: normal;
+  background: transparent;
+  color: var(--signal);
+  border: 1px solid color-mix(in srgb, var(--signal) 40%, var(--line));
+  border-radius: var(--radius-xs);
+  padding: 4px 7px;
+}
+
+.gp-findings li {
+  background: var(--panel);
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.gp-findings blockquote {
+  border-left-color: var(--signal);
+  color: var(--text-2);
+}
+
+.gp-ids li,
+.gp-related li {
+  background: var(--ink-raised);
+  border-color: var(--line);
+}
+
+.gp-section-head h2 {
+  font-family: var(--font-display);
+  font-weight: 520;
+  letter-spacing: -0.03em;
+}
+
+@media (max-width: 1100px) {
+  .gp ol.gp-ladder,
+  .gp-ladder {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .gp-identity,
+  .gp-ladder {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .gp-command {
+    display: flex;
+    overflow-x: auto;
+    grid-template-columns: none;
+    scrollbar-width: none;
+  }
+  .gp-command::-webkit-scrollbar {
+    display: none;
+  }
+  .gp-command a {
+    flex: 0 0 132px;
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 600px) {
+  .gp-identity,
+  .gp-ladder {
+    grid-template-columns: 1fr !important;
+  }
+  .gp-q {
+    scroll-margin-top: calc(var(--header-h) + 42px + 56px);
+  }
+  .gp-q > h2 {
+    font-size: 22px;
+  }
+}
