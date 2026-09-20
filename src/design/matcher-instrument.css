@@ -1,0 +1,70 @@
+/* Matcher and findings workspace as a research bench, not a form wizard. */
+
+.qm-instrument {
+  min-width: 0;
+}
+
+.qm,
+.question-map,
+[class^="qm-"] {
+  --qm-ink: var(--ink);
+}
+
+.qm-panel,
+.qm-workspace-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 22px 22px 20px;
+}
+
+.qm-panel-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.qm-letter {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--signal-ink);
+  background: var(--signal);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.qm-workspace-table {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.qm-workspace-table th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute);
+  background: var(--ink-raised);
+}
+
+.qm-workspace-table tbody tr:hover {
+  background: var(--panel-hover);
+}
+
+.qm-facets button[aria-pressed="true"] {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.qm-back {
+  font-size: 13px;
+  margin: 16px 0;
+}
+
+@media (max-width: 700px) {
+  .qm-panel,
+  .qm-workspace-panel {
+    padding: 16px;
+  }
+}
