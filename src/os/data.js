@@ -3,6 +3,7 @@ import {API_BASE} from '../platform/api.js';
 import {bundledCatalog, bundledProfile, graphCandidates} from '../evidence/graphProfile.js';
 import {emptyLayers} from './search.js';
 import {libraryKind} from './routes.js';
+import {canonicalId, identityFromEntry, identityFromKindSlug, SOURCE_META} from './identity.js';
 
 export function useLibrary() {
   const [state, setState] = useState({status: 'loading', entries: []});
@@ -35,6 +36,7 @@ export function useOsEntity(kind, slug) {
   useEffect(() => {
     if (!kind || !slug) { setState({status: 'missing'}); return undefined; }
     let live = true;
+    const ident = identityFromKindSlug(kind, slug);
     const ids = candidateIds(kind, slug);
     const once = async () => {
       const controller = new AbortController();
@@ -52,16 +54,19 @@ export function useOsEntity(kind, slug) {
     once()
       .then(async hit => {
         if (!live) return;
-        if (hit?.data) { setState({status: 'ready', data: hit.data, source: 'live', requested: ids[0]}); return; }
-        const resolved = await resolveOffline(ids, kind, slug);
+        if (hit?.data) {
+          setState({status: 'ready', data: withOrigin(hit.data, 'live', ident), source: 'live', requested: ident.id});
+          return;
+        }
+        const resolved = await resolveOffline(ids, kind, slug, ident);
         if (!live) return;
-        if (resolved) setState({status: 'ready', ...resolved, requested: ids[0]});
-        else setState({status: 'missing', requested: ids[0]});
+        if (resolved) setState({status: 'ready', ...resolved, requested: ident.id});
+        else setState({status: 'missing', requested: ident.id});
       })
       .catch(async () => {
-        const resolved = await resolveOffline(ids, kind, slug);
+        const resolved = await resolveOffline(ids, kind, slug, ident);
         if (!live) return;
-        if (resolved) setState({status: 'ready', ...resolved, requested: ids[0]});
+        if (resolved) setState({status: 'ready', ...resolved, requested: ident.id});
         else setState({status: 'error'});
       });
     return () => { live = false; };
@@ -69,15 +74,25 @@ export function useOsEntity(kind, slug) {
   return state;
 }
 
-async function resolveOffline(ids, kind, slug) {
+function withOrigin(data, source, ident) {
+  const entity = data?.entity ? {...data.entity, id: canonicalId(data.entity.id) || ident.id} : data?.entity;
+  return {
+    ...data,
+    entity,
+    origin: source,
+    origin_meta: SOURCE_META[source],
+  };
+}
+
+async function resolveOffline(ids, kind, slug, ident) {
   const bundled = await bundledProfile(ids);
-  if (bundled) return {data: bundled, source: 'snapshot'};
+  if (bundled) return {data: withOrigin(bundled, 'snapshot', ident), source: 'snapshot'};
   if (kind === 'protein') {
     const derived = await deriveProtein(slug);
-    if (derived) return {data: derived, source: 'derived'};
+    if (derived) return {data: withOrigin(derived, 'derived', ident), source: 'derived'};
   }
-  const catalog = await catalogFallback(ids, kind);
-  if (catalog) return {data: catalog, source: 'catalog'};
+  const catalog = await catalogFallback(ids, kind, slug);
+  if (catalog) return {data: withOrigin(catalog, 'catalog', ident), source: 'catalog'};
   return null;
 }
 
@@ -99,9 +114,10 @@ async function deriveProtein(slug) {
   const e = bundled.entity;
   const geneRel = (bundled.related || []).find(r => r.edge === 'ENCODED_BY');
   const geneId = geneRel?.id || (e.locus?.gene_symbol ? `gene:${e.locus.gene_symbol.toLowerCase()}` : null);
+  const proteinId = `protein:${(e.locus?.gene_symbol || slug).toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
   return {
     entity: {
-      id: `protein:${(e.locus?.gene_symbol || slug).toLowerCase()}`,
+      id: proteinId,
       name: `${e.name} protein`,
       kind: 'Protein',
       type: 'protein',
@@ -109,8 +125,9 @@ async function deriveProtein(slug) {
       external_ids: e.external_ids || {},
       locus: e.locus,
       identity: {
-        entity_class: e.identity?.entity_class || 'Protein product',
-        identity_sentence: e.identity?.identity_sentence || `${e.name} is a protein product.`,
+        entity_class: 'Protein product',
+        identity_sentence: `${e.name} is a protein product encoded by ${e.locus?.gene_symbol || 'its gene'}. This page is an identity view: Clarity does not currently store a protein node for it.`,
+        specimen: null,
       },
     },
     layers: emptyLayers(),
@@ -123,35 +140,41 @@ async function deriveProtein(slug) {
     studies: 0,
     dead_letters: [],
     derived_from: e.id,
-    derived_note: `${e.name} is indexed in this library as a measured biomarker, not as a separate protein node. This view is the molecular object (UniProt ${e.external_ids?.uniprot || 'unrecorded'}). Protein-level findings are not copied from the biomarker page: gene, protein and circulating measurement stay distinct.`,
+    derived_note: `${e.name} is indexed in this library as a measured biomarker (${e.id}), not as a separate protein node. This view is the molecular object (UniProt ${e.external_ids?.uniprot || 'unrecorded'}). Protein-level findings are not copied from the biomarker: gene, protein and circulating measurement stay distinct.`,
   };
 }
 
-async function catalogFallback(ids) {
+async function catalogFallback(ids, kind, slug) {
   const bundled = await bundledCatalog();
   const entries = bundled?.entries || [];
-  for (const id of ids) {
-    const entry = entries.find(e => e.id === `graph:${id}` || e.id === id);
-    if (!entry) continue;
-    const k = libraryKind(entry);
-    return {
-      entity: {
-        id,
-        name: entry.name,
-        kind: k === 'gene' ? 'Gene' : k === 'protein' ? 'Protein' : k === 'variant' ? 'Variant' : 'Entity',
-        type: k,
-        aliases: entry.aliases || [],
-        identity: {identity_sentence: `${entry.name} is indexed in the Clarity catalog as a ${k}.`},
-      },
-      layers: emptyLayers(),
-      findings: [],
-      quoted: [],
-      related: [],
-      studies: entry.coverage?.linked_studies ?? 0,
-      dead_letters: [],
-      catalog_only: true,
-      catalog_note: `The live graph entity payload was unavailable. This page uses the catalog row only — it does not reconstruct typed findings. Catalog coverage: ${entry.coverage?.quantified_outcomes || 0} quantified outcomes, ${entry.coverage?.linked_studies || 0} publications.${entry.summary ? ` Catalog note: ${entry.summary}` : ''}`,
-    };
-  }
-  return null;
+  const wanted = new Set(ids);
+  const match = entries.find(entry => {
+    const ident = identityFromEntry(entry);
+    if (wanted.has(ident.id) || wanted.has(String(entry.id || '').replace(/^graph:/, ''))) return true;
+    return ident.kind === kind && ident.slug === slug;
+  });
+  if (!match) return null;
+  const ident = identityFromEntry(match);
+  const k = ident.kind || libraryKind(match);
+  const kindLabel = k === 'gene' ? 'Gene' : k === 'protein' ? 'Protein' : k === 'variant' ? 'Variant'
+    : k === 'biomarker' ? 'Biomarker' : k === 'intervention' ? 'Intervention'
+    : k === 'precision_context' ? 'PrecisionContext' : k === 'test' ? 'Test' : 'Entity';
+  return {
+    entity: {
+      id: ident.id,
+      name: match.name,
+      kind: kindLabel,
+      type: k,
+      aliases: match.aliases || [],
+      identity: {identity_sentence: `${match.name} is indexed in the Clarity catalog as a ${k}.`},
+    },
+    layers: emptyLayers(),
+    findings: [],
+    quoted: [],
+    related: [],
+    studies: match.coverage?.linked_studies ?? 0,
+    dead_letters: [],
+    catalog_only: true,
+    catalog_note: `The live graph entity payload was unavailable. This page uses the catalog row only — it does not reconstruct typed findings. Catalog coverage: ${match.coverage?.quantified_outcomes || 0} quantified outcomes, ${match.coverage?.linked_studies || 0} publications.${match.summary ? ` Catalog note: ${match.summary}` : ''}`,
+  };
 }

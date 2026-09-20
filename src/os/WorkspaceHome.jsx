@@ -30,7 +30,7 @@ export default function WorkspaceHome({go}) {
           )) : <p className="os-note">Inspect a finding and save its study.</p>}
           <h2 style={{marginTop: 28}}>Comparisons</h2>
           {store.comparisons.length ? store.comparisons.map(c => (
-            <a key={c.id} href="/explore/compare" onClick={e => { e.preventDefault(); go('/explore/compare'); }} style={{display: 'block', padding: '8px 0'}}>{c.ids.join(' vs ')}</a>
+            <a key={c.id} href="/compare" onClick={e => { e.preventDefault(); go('/compare'); }} style={{display: 'block', padding: '8px 0'}}>{c.ids.join(' vs ')}</a>
           )) : <p className="os-note">Launch compare from an entity or catalog preview.</p>}
         </section>
       </div>

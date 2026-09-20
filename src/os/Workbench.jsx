@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {CatalogPulse, kindColor} from './Figures.jsx';
 import {MiniNeighborhood} from './GraphNeighborhood.jsx';
 import {libraryKind, pathForEntry, KIND_LABEL} from './routes.js';
+import {identityFromEntry} from './identity.js';
 import {loadOsStore, loadInvestigations, STORAGE_NOTE} from './store.js';
 import {bundledProfile} from '../evidence/graphProfile.js';
 
@@ -32,7 +33,7 @@ export default function Workbench({entries, go, openCommand, graphSeed}) {
   const [related, setRelated] = useState([]);
   useEffect(() => {
     if (!seed) { setRelated([]); return undefined; }
-    const id = String(seed.id).replace(/^graph:/, '');
+    const id = identityFromEntry(seed).id;
     let live = true;
     bundledProfile([id]).then(profile => {
       if (live) setRelated(profile?.related || []);
@@ -76,7 +77,7 @@ export default function Workbench({entries, go, openCommand, graphSeed}) {
             </h2>
             {related.length ? (
               <MiniNeighborhood
-                focus={{id: String(seed.id).replace(/^graph:/, ''), name: seed.name, kind: libraryKind(seed)}}
+                focus={{id: identityFromEntry(seed).id, name: seed.name, kind: libraryKind(seed)}}
                 related={related}
                 go={go}
                 height={300}

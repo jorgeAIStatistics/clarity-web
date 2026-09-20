@@ -565,8 +565,46 @@ body { overflow: hidden; }
   color: var(--text-2);
 }
 
-.os-entity .vx-research-actions { display: none; }
-.os-entity .vx-report { background: transparent; border: 0; box-shadow: none; }
+.os-qspine a[data-indexed="constraint"] strong { color: var(--mute); }
+.os-qspine a[data-indexed="false"] strong { color: var(--caution); }
+
+.os-origin {
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.os-origin-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--signal);
+  margin: 0 0 6px;
+}
+.os-origin-derived {
+  border-style: dashed;
+  border-color: var(--os-kind-protein);
+}
+.os-origin-catalog { border-style: dotted; }
+.os-origin-snapshot { border-color: color-mix(in srgb, var(--caution) 40%, var(--line)); }
+.os-entity[data-origin="derived"] .os-identity { border-top-style: dashed; }
+.os-entity[data-origin="catalog"] .os-identity { border-top-style: dotted; }
+
+.os-methods .os-module h2 { font-size: 22px; }
+.os-legacy-banner {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+/* Intervention extract: restyle the visual report so it sits in the OS, not the old product. */
+.os-entity .vx-report { background: transparent; border: 0; box-shadow: none; max-width: none; }
 .os-entity .vx-report-head h1 { font-family: var(--font-display); }
 .os-status { font-size: 13px; color: var(--mute); padding: 24px; }
 .os-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -580,6 +618,9 @@ body { overflow: hidden; }
   }
   .os-cmd-body { min-height: 0; }
   .os-nav a:nth-child(n+4) { display: none; }
+  .os-catalog .os-ledger th:nth-child(3),
+  .os-catalog .os-ledger td:nth-child(3) { display: none; }
+  .os-inspect { position: static; }
 }
 
 @media (prefers-reduced-motion: reduce) {

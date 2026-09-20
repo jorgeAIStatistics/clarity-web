@@ -1,3 +1,5 @@
+import {sameIdentity} from './identity.js';
+
 const KEY = 'clarity-os-v1';
 const PROJECTS = 'clarity-research-projects-v1';
 
@@ -22,6 +24,10 @@ function write(next) {
   return next;
 }
 
+function itemKey(entry) {
+  return {id: entry.id, path: entry.path, kind: entry.kind};
+}
+
 export function loadOsStore() {
   return read();
 }
@@ -34,16 +40,19 @@ export function rememberEntity(entry) {
     name: entry.name,
     kind: entry.kind,
     path: entry.path,
+    origin: entry.origin,
     at: new Date().toISOString(),
   };
-  state.recents = [item, ...state.recents.filter(x => x.id !== entry.id)].slice(0, 24);
+  state.recents = [item, ...state.recents.filter(x => !sameIdentity(itemKey(x), itemKey(entry)))].slice(0, 24);
   return write(state);
 }
 
 export function togglePin(entry) {
   const state = read();
-  const exists = state.pins.some(x => x.id === entry.id);
-  state.pins = exists ? state.pins.filter(x => x.id !== entry.id) : [{...entry, at: new Date().toISOString()}, ...state.pins].slice(0, 40);
+  const exists = state.pins.some(x => sameIdentity(itemKey(x), itemKey(entry)));
+  state.pins = exists
+    ? state.pins.filter(x => !sameIdentity(itemKey(x), itemKey(entry)))
+    : [{...entry, at: new Date().toISOString()}, ...state.pins].slice(0, 40);
   return write(state);
 }
 
@@ -70,7 +79,9 @@ export function addToCollection(name, entry) {
     col = {id: `col:${Date.now()}`, name: title, items: [], at: new Date().toISOString()};
     state.collections = [col, ...state.collections].slice(0, 20);
   }
-  if (!col.items.some(x => x.id === entry.id)) col.items = [{id: entry.id, name: entry.name, kind: entry.kind, path: entry.path}, ...col.items];
+  if (!col.items.some(x => sameIdentity(itemKey(x), itemKey(entry)))) {
+    col.items = [{id: entry.id, name: entry.name, kind: entry.kind, path: entry.path}, ...col.items];
+  }
   return write(state);
 }
 

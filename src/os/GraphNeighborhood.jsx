@@ -5,7 +5,7 @@ import {kindColor} from './Figures.jsx';
 
 function kindOf(node) {
   if (node.kind) return String(node.kind).replace('PrecisionContext', 'precision_context').replace('Compound', 'intervention');
-  const prefix = String(node.id || '').split(':')[0];
+  const prefix = String(node.id || '').replace(/^graph:/, '').split(':')[0];
   return prefix === 'compound' ? 'intervention' : prefix;
 }
 

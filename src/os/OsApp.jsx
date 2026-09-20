@@ -102,7 +102,10 @@ export default function OsApp() {
         {nav === 'graph' && <GraphScreen focus={route.focus} go={go} />}
         {nav === 'investigate' && (
           <Suspense fallback={<p className="os-status">Loading investigation…</p>}>
-            <div className="os-work"><EvidenceMatcher /></div>
+            <div className="os-work">
+              <p className="os-legacy-banner">Investigation uses the existing question map. It is a deterministic match against the library, not a chatbot. A rebuilt investigation environment is a later phase.</p>
+              <EvidenceMatcher />
+            </div>
           </Suspense>
         )}
         {nav === 'compare' && (

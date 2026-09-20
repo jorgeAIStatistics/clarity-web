@@ -3,6 +3,18 @@ import {classifyCommand, searchEntities, disambiguate} from './search.js';
 import {kindColor} from './Figures.jsx';
 import {KIND_LABEL} from './routes.js';
 
+const KIND_NOTE = {
+  gene: 'A gene as sequence. Not a variant, protein, or circulating measurement.',
+  protein: 'A molecular product. Protein-level evidence is not circulating-biomarker evidence.',
+  variant: 'One sequence change. Do not generalize to the gene or to other variants.',
+  biomarker: 'A quantity measured in a sample or image. Assay, units and population travel with the value.',
+  intervention: 'A compound or exposure. Efficacy, safety and applicability stay separate.',
+  test: 'A test as performed. Accuracy is not evidence that testing helps.',
+  precision_context: 'Marker × treatment × condition. Evidence belongs to the combination.',
+  condition: 'A disease or state findings are reported for.',
+  metabolite: 'A small molecule measured in a sample.',
+};
+
 export default function Command({open, onClose, entries, go, seed = '', defaultMode}) {
   const [text, setText] = useState(seed);
   const [mode, setMode] = useState(defaultMode || 'entity');
@@ -33,6 +45,7 @@ export default function Command({open, onClose, entries, go, seed = '', defaultM
   }
 
   if (!open) return null;
+  const current = hits[cursor];
   return (
     <div className="os-cmd" role="dialog" aria-label="Command" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="os-cmd-panel">
@@ -70,14 +83,18 @@ export default function Command({open, onClose, entries, go, seed = '', defaultM
             <h3 style={{fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 26, margin: '8px 0'}}>{text || 'Ask a research question'}</h3>
             <p>This opens an investigation against the retained library: a question map, angle coverage, tensions and source passages. It is a deterministic match, not a chatbot.</p>
             {hits.length > 0 && (
-              <p className="os-note">Named in the catalog: {hits.slice(0, 6).map(h => h.name).join(' · ')}</p>
+              <p className="os-note">Named in the catalog: {hits.slice(0, 6).map(h => `${h.name} (${h.kindLabel})`).join(' · ')}</p>
             )}
             <button className="os-primary" type="button" onClick={ask} disabled={!text.trim()}>Open as investigation</button>
           </div>
         ) : (
           <div className="os-cmd-body">
             <div className="os-cmd-list" role="listbox">
-              {ambi.ambiguous && <p className="os-note" style={{padding: '8px 16px'}}>Ambiguous symbol — {ambi.kinds.map(k => KIND_LABEL[k] || k).join(', ')}. Pick a type.</p>}
+              {ambi.ambiguous && (
+                <p className="os-note" style={{padding: '8px 16px'}}>
+                  Ambiguous symbol — {ambi.kinds.map(k => KIND_LABEL[k] || k).join(', ')}. These are different objects. Pick a type.
+                </p>
+              )}
               {hits.map((h, i) => (
                 <button
                   type="button"
@@ -87,24 +104,27 @@ export default function Command({open, onClose, entries, go, seed = '', defaultM
                   onMouseEnter={() => setCursor(i)}
                   onClick={() => run(h)}
                 >
-                  <span className="os-kind" style={{'--kind': kindColor(h.kind)}}>{h.kindLabel}</span>
+                  <span className="os-kind" style={{'--kind': kindColor(h.kind)}}>{h.kindLabel}{h.derived ? ' · derived' : ''}</span>
                   <span>{h.name}<small style={{display: 'block', color: 'var(--mute)', fontSize: 11}}>{h.id}</small></span>
-                  <span className="os-num">{h.coverage.quantified_outcomes || h.coverage.linked_studies || 0}</span>
+                  <span className="os-num">{h.derived ? 'view' : (h.coverage.quantified_outcomes || h.coverage.linked_studies || 0)}</span>
                 </button>
               ))}
               {text && !hits.length && <p className="os-status">No indexed object matches. Try a gene symbol, biomarker, or compound name — or switch to Question.</p>}
-              {!text && <p className="os-status">Search the graph and catalog by name. Questions belong on the Question tab.</p>}
+              {!text && <p className="os-status">Search the graph and catalog by name. A gene, a protein, a circulating measurement and a drug are different pages even when they share a symbol.</p>}
             </div>
             <div className="os-cmd-side">
-              {hits[cursor] ? (
+              {current ? (
                 <>
-                  <span className="os-kind" style={{'--kind': kindColor(hits[cursor].kind)}}>{hits[cursor].kindLabel}</span>
-                  <h3>{hits[cursor].name}</h3>
-                  <p>{hits[cursor].summary || 'Indexed object. Open the instrument to inspect findings, gaps and neighbors.'}</p>
-                  <p className="os-cmd-note">{hits[cursor].coverage.linked_studies || 0} publications · {hits[cursor].coverage.quantified_outcomes || 0} outcomes with estimates. Counts are coverage, not grades.</p>
+                  <span className="os-kind" style={{'--kind': kindColor(current.kind)}}>{current.kindLabel}</span>
+                  <h3>{current.name}</h3>
+                  <p className="os-id">{current.id}</p>
+                  <p>{KIND_NOTE[current.kind] || 'Indexed object. Open the instrument to inspect findings, gaps and neighbors.'}</p>
+                  <p>{current.summary || ''}</p>
+                  {current.derived && <p className="os-warn">Derived identity view. Not a graph node. Findings are not copied onto it.</p>}
+                  <p className="os-cmd-note">{current.derived ? 'No protein-level findings are claimed here.' : `${current.coverage.linked_studies || 0} publications · ${current.coverage.quantified_outcomes || 0} outcomes with estimates. Counts are coverage, not grades.`}</p>
                 </>
               ) : (
-                <p className="os-note">Entity search returns typed objects. A gene, a protein, a circulating measurement and a drug are different pages even when they share a symbol.</p>
+                <p className="os-note">Entity search returns typed objects. EGFR the gene is not eGFR the filtration estimate. IL18 the gene is not IL-18 the circulating measurement.</p>
               )}
             </div>
           </div>

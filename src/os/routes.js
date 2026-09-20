@@ -118,7 +118,7 @@ export function parseOsPath(pathname = '/', search = '') {
   if (path === '/investigate' || path === '/explore/matcher' || path === '/connect' || path === '/researcher') {
     return {screen: 'investigate'};
   }
-  if (path === '/explore/compare') return {screen: 'compare'};
+  if (path === '/explore/compare' || path === '/compare') return {screen: 'compare'};
   if (path === '/methods' || path === '/learn' || path === '/learn/basics' || path === '/learn/evidence' || path === '/methodology') {
     return {screen: 'methods', hash: path === '/methodology' ? 'methodology' : ''};
   }
