@@ -124,6 +124,7 @@ nav.ev-domains a[aria-current] {
 .cl-nav .cl-nav-signal,
 header.ev-header nav .cl-nav-signal {
   color: var(--signal) !important;
+  display: inline-flex !important;
 }
 
 .cl-badge,
@@ -243,9 +244,13 @@ nav.ev-domains a[aria-current] {
   .cl-kicker,
   .guide-tagline,
   .cl-search kbd,
-  header.ev-header > .ev-badge,
-  .cl-nav-optional {
+  header.ev-header > .ev-badge {
     display: none;
+  }
+  .cl-nav a.cl-nav-optional,
+  .cl-nav button.cl-nav-optional,
+  header.ev-header nav a.cl-nav-optional {
+    display: none !important;
   }
 }
 
