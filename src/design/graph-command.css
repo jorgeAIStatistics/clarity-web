@@ -1,0 +1,83 @@
+@import './tokens.css';
+
+/* Entity command file: sticky question rail, pipeline ladder, quieter gaps. */
+.gp{min-width:0}
+.gp-command-hero.ev-hero{padding-bottom:8px}
+.gp-command{
+  position:sticky;top:calc(var(--shell) + 36px);z-index:8;
+  background:color-mix(in srgb,var(--ink) 92%,transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--hairline);
+  margin:0 0 28px;padding:8px 0 10px;
+}
+.gp-command-nav{display:flex;flex-wrap:wrap;gap:4px 0}
+.gp-command-nav a{
+  font:600 11px/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted)!important;text-decoration:none!important;
+  padding:8px 12px 8px 0;margin-right:14px;
+  border-bottom:1px solid transparent;
+}
+.gp-command-nav a:hover{color:var(--text)!important}
+.gp-ladder{
+  list-style:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:0;margin:10px 0 0;padding:0;border:1px solid var(--hairline);
+}
+.gp-ladder li{
+  border:0!important;border-right:1px solid var(--hairline)!important;
+  border-radius:0!important;padding:10px 12px!important;
+  background:var(--ink-2)!important;gap:2px;
+}
+.gp-ladder li:last-child{border-right:0!important}
+.gp-ladder li[data-indexed=true]{background:#0d1c19!important;box-shadow:inset 0 2px 0 var(--accent)}
+.gp-ladder li[data-indexed=false]{background:transparent!important;opacity:.7;border-style:solid!important}
+.gp-ladder span{font:600 9.5px/1.2 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.gp-ladder strong{font-size:13px;font-weight:550;color:var(--text);font-family:var(--font-display)}
+.gp-ladder li[data-indexed=false] strong{color:var(--muted);font-size:12.5px}
+.gp-identity,.gp-facts{gap:6px 32px}
+.gp-identity dt,.gp-facts dt,.gp-ids small{
+  font:600 10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+}
+.gp-q{margin:0 0 48px;padding-top:8px}
+.gp-q>h2{
+  display:flex;align-items:baseline;gap:12px;
+  font-family:var(--font-display);font-size:24px;font-weight:550;
+  letter-spacing:-.03em;margin:0 0 14px;
+}
+.gp-q>h2 em{
+  font:700 10px/1 var(--font-mono)!important;letter-spacing:.12em;
+  color:var(--accent-ink)!important;background:var(--accent);border-radius:0!important;padding:5px 6px;
+}
+.gp-lead{font-size:16.5px;line-height:1.65;color:var(--text-soft);max-width:78ch}
+.gp-lead[data-gap]{border-left:2px solid var(--gap);padding-left:14px;color:#e6d6b6}
+.gp-what,.gp-layers{
+  display:grid;gap:1px;background:var(--hairline);border:1px solid var(--hairline);
+}
+.gp-what{grid-template-columns:repeat(3,minmax(0,1fr))}
+.gp-layers{grid-template-columns:repeat(5,minmax(0,1fr))}
+.gp-what>div,.gp-layer{
+  border:0!important;border-radius:0!important;background:var(--ink-2)!important;padding:16px;
+}
+.gp-layer[data-state=findings]{background:#0d1c19!important}
+.gp-layer[data-state=gap]{background:transparent!important}
+.gp-findings{display:grid;gap:1px;background:var(--hairline);border:1px solid var(--hairline)}
+.gp-findings li{
+  padding:16px 16px 14px;border:0!important;border-radius:0!important;background:var(--ink-2)!important;
+}
+.gp-finding-head strong{font-family:var(--font-mono);font-size:15px;font-weight:550}
+.gp-findings blockquote{border-left:2px solid var(--accent-dim);color:var(--text-soft);font-size:13.5px}
+.gp-quoted{
+  margin:16px 0 0;padding:12px 14px;border:1px dashed var(--hairline-strong)!important;
+  border-radius:0!important;background:transparent;
+}
+.gp-related{gap:8px}
+.gp-related li{border-radius:0!important;background:var(--ink-2);padding:8px 12px}
+.gp-ids li{border-radius:0!important;background:var(--ink-2)}
+.gp-ids code{font-family:var(--font-mono);font-size:.92em}
+.gp-stale{border-radius:0!important;border-left:2px solid var(--gap)!important;background:var(--gap-bg)!important}
+
+@media(max-width:1100px){.gp-ladder{grid-template-columns:repeat(3,minmax(0,1fr))}.gp-what{grid-template-columns:1fr}}
+@media(max-width:700px){
+  .gp-command{position:static}
+  .gp-ladder,.gp-layers{grid-template-columns:1fr}
+  .gp-ladder li{border-right:0!important;border-bottom:1px solid var(--hairline)!important}
+}
