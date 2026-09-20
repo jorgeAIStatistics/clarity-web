@@ -1,0 +1,79 @@
+/* Clarity instrument tokens.
+   Color encodes domain and evidence layer, never statistical significance.
+   Future surfaces should consume these variables instead of introducing new hexes. */
+:root {
+  --ink: #07090f;
+  --ink-raised: #0c1018;
+  --panel: #10151f;
+  --panel-2: #151c28;
+  --panel-hover: #18202e;
+  --line: #243044;
+  --line-strong: #33425a;
+  --line-soft: rgba(196, 214, 236, 0.08);
+
+  --text: #e8eef7;
+  --text-2: #c5d0e0;
+  --mute: #8b9bb3;
+  --mute-2: #6f7f96;
+
+  --signal: #3ee0c4;
+  --signal-dim: #1a7a6c;
+  --signal-ink: #071411;
+  --caution: #d4a24a;
+  --caution-ink: #24190a;
+  --warn: #e08a7a;
+  --field: #7aa7e0;
+  --violet: #9a8cf5;
+
+  --layer-mechanism: #8a70dc;
+  --layer-preclinical: #c7813a;
+  --layer-observational: #3f8ddb;
+  --layer-interventional: #1fa383;
+  --layer-guidelines: #b08418;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+
+  --measure: 78ch;
+  --page: 1180px;
+  --page-wide: 1280px;
+  --header-h: 58px;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-panel: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+html, body, #root {
+  background: var(--ink);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  letter-spacing: -0.011em;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--signal) 35%, #000);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
