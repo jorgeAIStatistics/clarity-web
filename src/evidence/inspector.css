@@ -1,0 +1,40 @@
+/* Source inspection. On a wide screen it is a column that holds its place beside the reading;
+   below that it is a full-width sheet, because two 300px columns on a phone serve neither. */
+.insp{
+  display:flex;flex-direction:column;min-height:0;
+  border-left:1px solid var(--hairline);background:var(--surface-1);
+}
+.insp--empty{padding:var(--s5);justify-content:flex-start}
+.insp-bar{
+  display:flex;align-items:center;gap:var(--s3);
+  padding:var(--s3) var(--s4);border-bottom:1px solid var(--hairline);
+  position:sticky;top:0;background:var(--surface-1);z-index:1;
+}
+.insp-bar h3{font-size:var(--text-micro);letter-spacing:.04em;color:var(--ink-subtle);font-weight:500;margin-right:auto;outline:none}
+.insp-body{padding:var(--s4);overflow:auto;min-height:0}
+.insp-title{font-size:var(--text-small);line-height:1.4;color:var(--ink);margin-bottom:var(--s3)}
+.insp-section{
+  font-size:var(--text-micro);letter-spacing:.04em;color:var(--ink-subtle);
+  margin:var(--s5) 0 var(--s2);padding-top:var(--s3);border-top:1px solid var(--hairline);
+}
+.insp-meta{margin:0;display:grid;gap:var(--s2)}
+.insp-meta div{display:grid;grid-template-columns:76px minmax(0,1fr);gap:var(--s3);align-items:baseline}
+.insp-meta dt{font-size:var(--text-micro);color:var(--ink-subtle)}
+.insp-meta dd{margin:0;font-size:var(--text-fine);color:var(--ink-muted);overflow-wrap:anywhere}
+.insp .c-quote{font-size:var(--text-small);margin:var(--s2) 0 0}
+.insp .c-notice{margin-top:var(--s4)}
+
+@media (max-width:1180px){
+  .insp{
+    position:fixed;inset:auto 0 0 0;max-height:min(78vh,620px);z-index:40;
+    border-left:0;border-top:1px solid var(--hairline-loud);
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow:0 -12px 40px rgba(0,0,0,.55);
+    animation:insp-rise var(--medium) var(--ease);
+  }
+  .insp--empty{display:none}
+  .insp-bar{padding:var(--s4)}
+  .insp-body{padding:0 var(--s4) var(--s7)}
+}
+@keyframes insp-rise{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.insp{animation:none}}

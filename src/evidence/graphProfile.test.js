@@ -412,12 +412,15 @@ test('an engine answering with no graph rows is a failed read, not a small libra
 test('a published catalog is labelled, and a live one carries no caveat', () => {
   assert.equal(catalogFreshness({ served_from: 'graph', graph_rows: 137 }), null);
   const stale = catalogFreshness({ served_from: 'snapshot', published_at: '2026-09-18T19:26:30Z', graph_rows: 137 });
-  assert.match(stale, /Catalog published 2026-09-18/);
-  assert.match(stale, /did not answer in time/);
-  assert.match(stale, /short of nodes added since/);
+  assert.match(stale, /published 2026-09-18/, 'the notice carries the date of the copy');
+  assert.match(stale, /not from the live graph/, 'and says plainly that this is not the live graph');
+  assert.match(stale, /added since is not in this list/, 'and what that costs the reader');
   // A published copy with 137 rows is not "short" — short means the read returned nothing.
   assert.equal(libraryIsShort({ served_from: 'snapshot', published_at: '2026-09-18T19:26:30Z', graph_rows: 137 }), false);
-  assert.match(catalogFreshness({ served_from: 'snapshot' }), /Catalog published earlier/);
+  assert.match(catalogFreshness({ served_from: 'snapshot' }), /published earlier/);
+  // The engine stamps the snapshot's own date as published_at; when only a build time is present
+  // the notice still has to name a date rather than silently claiming the copy is current.
+  assert.match(catalogFreshness({ served_from: 'snapshot', generated_at: '2026-10-13T22:00:00Z' }), /published 2026-10-13/);
 });
 
 test('quoted numbers become their own rows and are never mixed into findings', () => {

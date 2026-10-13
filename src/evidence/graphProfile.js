@@ -2,6 +2,10 @@
 // Nothing here computes a new statistic: values are formatted exactly as extracted.
 export const LAYERS=['mechanism','preclinical','observational','interventional','guidelines'];
 const LAYER_LABELS={mechanism:'Mechanism',preclinical:'Preclinical',observational:'Observational',interventional:'Interventional',guidelines:'Guidelines'};
+// Stored kinds arrive as PrecisionContext or precision_context depending on the writer; neither is
+// a phrase a reader should be shown.
+export const kindWords=kind=>String(kind||'entity')
+  .replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/_/g,' ').trim().toLowerCase()||'entity';
 export const layerLabel=layer=>LAYER_LABELS[layer]||layer;
 
 export const KINDS=['classification','discrimination','prognosis','association','effect','utility','guideline'];
@@ -440,8 +444,8 @@ export function libraryIsShort(payload){
 // Readable, but possibly behind, and the page says which rather than letting one pass for the other.
 export function catalogFreshness(payload){
   if(payload?.served_from!=='snapshot')return null;
-  const at=String(payload.published_at||'').slice(0,10);
-  return `Catalog published ${at||'earlier'}. The live evidence graph did not answer in time, so this list may be short of nodes added since.`;
+  const at=String(payload.published_at||payload.generated_at||'').slice(0,10);
+  return `These rows come from the copy published ${at||'earlier'}, not from the live graph — it did not answer. Anything added since is not in this list.`;
 }
 
 // Files built into the site itself, served from this origin. The engine's own snapshot covers a

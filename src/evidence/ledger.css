@@ -1,0 +1,62 @@
+/* The finding ledger. Rows align on one axis per measure family so seven findings can be read as a
+   set instead of seven cards read one at a time. */
+.fl-block{margin:var(--s5) 0 var(--s6)}
+.fl-block-head{margin-bottom:var(--s3)}
+.fl-block-head h3{font-size:var(--text-small);font-weight:600;color:var(--ink);letter-spacing:0}
+.fl-block-head .c-note{margin-top:var(--s1)}
+
+.fl-table{table-layout:fixed;min-width:860px}
+.fl-table th:nth-child(1),.fl-table td:nth-child(1){width:140px}
+.fl-table th:nth-child(2),.fl-table td:nth-child(2){width:144px}
+.fl-table th.fl-plot-head,.fl-table td.fl-plot{width:252px}
+.fl-table th:nth-child(5),.fl-table td.fl-prov{width:132px}
+.fl-table th:nth-child(6),.fl-table td.fl-source{width:118px}
+
+.fl-kind{font-size:var(--text-fine);color:var(--ink)}
+.fl-kind small{display:block;font-size:var(--text-micro);color:var(--ink-subtle);margin-top:2px}
+.fl-est .c-num{font-size:var(--text-small);color:var(--ink)}
+.fl-est small{display:block;font-size:var(--text-micro);color:var(--ink-subtle);margin-top:3px}
+.fl-context{font-size:var(--text-fine);color:var(--ink-muted);line-height:1.45}
+.fl-prov{font-size:var(--text-micro);color:var(--ink-muted);line-height:1.5}
+.fl-prov [data-cited]{color:var(--caution)}
+.fl-missing{color:var(--ink-faint);font-style:normal}
+
+.fl-inspect{
+  border:0;background:none;padding:0;cursor:pointer;text-align:left;
+  font:var(--text-micro)/1.5 var(--mono);color:var(--accent);
+}
+.fl-inspect:hover{color:var(--accent-hover);text-decoration:underline;text-underline-offset:3px}
+.fl-table tr[data-active] td{background:var(--surface-2);box-shadow:inset 2px 0 0 var(--accent)}
+.fl-table tr[data-cited] .fl-est .c-num{color:var(--ink-muted)}
+
+/* ---- the mark ---------------------------------------------------------- */
+.fl-plot{padding-right:var(--s4)!important}
+.fl-track{position:relative;display:block;height:20px;margin-top:2px}
+.fl-null{position:absolute;top:0;bottom:0;width:1px;background:var(--hairline-loud);transform:translateX(-.5px)}
+.fl-ci{position:absolute;top:50%;height:2px;background:var(--ink-muted);transform:translateY(-50%);border-radius:1px}
+.fl-ci[data-clipped-low]{border-left:2px dotted var(--caution)}
+.fl-ci[data-clipped-high]{border-right:2px dotted var(--caution)}
+.fl-point{
+  position:absolute;top:50%;width:10px;height:10px;border-radius:50%;
+  background:var(--ink);transform:translate(-50%,-50%);
+}
+/* Shape, not colour: hollow means the interval crosses the null. */
+.fl-point[data-open]{background:var(--canvas);box-shadow:inset 0 0 0 1.6px var(--ink)}
+/* A point with no reported interval is drawn as a point and nothing else — no implied width. */
+.fl-point[data-bare]{width:8px;height:8px;box-shadow:0 0 0 3px var(--caution-wash)}
+
+.fl-plot-head{vertical-align:bottom}
+.fl-plot-label{display:block;margin-bottom:3px}
+.fl-axis{
+  position:relative;display:block;height:13px;
+  font:10px/1 var(--mono);color:var(--ink-faint);font-weight:400;letter-spacing:0;
+}
+.fl-axis i{position:absolute;transform:translateX(-50%);white-space:nowrap;font-style:normal}
+.fl-axis i[data-null]{color:var(--ink-subtle)}
+.fl-axis i:first-child{transform:none}
+.fl-axis i:last-child{transform:translateX(-100%)}
+
+@media (max-width:760px){
+  .fl-table{min-width:720px}
+  .fl-table th.fl-plot-head,.fl-table td.fl-plot{width:168px}
+}

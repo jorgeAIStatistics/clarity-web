@@ -1,9 +1,14 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {API_BASE} from '../platform/api.js';
-import {layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,quotedRows,provenanceNote,bundledCatalog,bundledProfile,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
+import {kindWords,layerLabel,flatten,valueText,aucStrip,classificationRows,relationLabel,deadLetterText,diagnose,freshness,graphCandidates,graphMatches,graphPath,catalogFreshness,libraryIsShort,quotedRows,provenanceNote,bundledCatalog,bundledProfile,findingsCsv,findingsJson,graphPrefixes,identity,biology,measurement,meaning,utility,ladder,scopeNote,questions,fetchWithRetry,externalLinks,idCaption,ucscLink,kindBadge,LAYERS} from './graphProfile.js';
 import FindingsWorkspace from '../research/FindingsWorkspace.jsx';
+import FindingLedger from './FindingLedger.jsx';
+import Inspector from './Inspector.jsx';
+import {Crumbs} from '../design/Shell.jsx';
 import './graph-profile.css';
+import './ledger.css';
+import './inspector.css';
 
 function Link({to,go,children,...props}){return <a href={to} onClick={e=>{if(!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.button===0){e.preventDefault();go(to);}}} {...props}>{children}</a>;}
 const clip=(text,n)=>text.length>n?text.slice(0,n-1)+'…':text;
@@ -41,22 +46,7 @@ export function AccuracyFigures({table,strip}){
 }
 
 const EMPTY_TABLE={rows:[],columns:[]},EMPTY_STRIP={points:[],domain:[0.5,1]};
-function FindingList({rows}){
-  return <ul className="gp-findings">{rows.map(f=><li key={f.id}>
-    <div className="gp-finding-head"><strong>{valueText(f)}</strong><span>{[f.target&&`for ${f.target}`,f.population,f.setting].filter(Boolean).join(' · ')}</span></div>
-    {f.quote&&<blockquote>{f.quote}</blockquote>}
-    <small>{f.pmid&&<a href={`https://pubmed.ncbi.nlm.nih.gov/${f.pmid}/`} target="_blank" rel="noreferrer">PMID {f.pmid}</a>}{f.year?` · ${f.year}`:''}{f.layer?` · ${layerLabel(f.layer)} layer`:''}{provenanceNote(f)?` · ${provenanceNote(f)}`:''} · {f.review_state==='reviewed'?'Reviewed':f.review_state==='partially_reviewed'?'Partially reviewed':'Automated reading, not expert-reviewed'}</small>
-  </li>)}</ul>;
-}
-
 const INDEX={biomarker:['/biomarkers','All biomarkers','BIOMARKERS'],diagnostic:['/diagnostics','All diagnostics','DIAGNOSTICS'],screening:['/screening','All screening','SCREENING'],precision_oncology:['/precision-medicine','All precision medicine','PRECISION MEDICINE']};
-function Hero({name,go,type='biomarker',children}){
-  const heading=useRef(null);
-  const [path,back,eyebrow]=INDEX[type]||INDEX.biomarker;
-  useEffect(()=>{heading.current?.focus({preventScroll:true});},[name]);
-  return <div className="ev-hero"><Link className="ev-back" to={path} go={go}><ArrowLeft size={15}/>{back}</Link><div className="ev-eyebrow">{eyebrow} / GRAPH PROFILE · AUTOMATED</div><h1 ref={heading} tabIndex={-1}>{name}</h1>{children}</div>;
-}
-
 export function useGraphEntity(slug,type='biomarker',attempt=0){
   const [state,setState]=useState({status:'loading'});
   useEffect(()=>{
@@ -97,26 +87,30 @@ export function useGraphEntity(slug,type='biomarker',attempt=0){
 // belong on the same page — under the curated reading, never merged into it.
 export function GraphFindings({slug,type='biomarker'}){
   const state=useGraphEntity(slug,type);
+  const [inspecting,setInspecting]=useState(null);
   if(state.status!=='ready')return null;
   const {entity,findings}=state.data;
   const rows=flatten(findings);
   if(!rows.length)return null;
   const q4=meaning(entity,findings),q5=utility(entity,findings),scope=scopeNote(entity,findings),rungs=ladder(entity,findings);
   const strip=aucStrip(findings),table=classificationRows(findings);
+  const ledgerRows=q4.flatMap(group=>group.rows.map(row=>({...row,kindLabel:group.label})));
   const inLibrary=rungs.filter(r=>r.indexed).map(r=>r.label),missing=rungs.filter(r=>!r.indexed).map(r=>r.label);
-  return <section className="ev-panel gp-inline" aria-labelledby="gp-inline-title">
+  return <section className="gp-inline" aria-labelledby="gp-inline-title">
     <h2 id="gp-inline-title">Also in the evidence graph</h2>
-    <p className="ev-note">{rows.length} source-bound {rows.length===1?'finding':'findings'} extracted automatically for {entity.name}, kept separate from the curated reading above. Not expert-reviewed.</p>
-    {scope&&<p className="gp-scope">{scope}</p>}
-    {q4.map(g=><div className="gp-kind" key={g.kind}>
-      <h3>{g.label}<span>{g.rows.length}</span></h3>
-      {g.sentences.map(sentence=><p className="gp-meaning" key={sentence}>{sentence}</p>)}
-      {g.kind==='classification'&&<AccuracyFigures table={table} strip={EMPTY_STRIP}/>}
-      {g.kind==='discrimination'&&<AccuracyFigures table={EMPTY_TABLE} strip={strip}/>}
-      <FindingList rows={g.rows}/>
-    </div>)}
-    <p className="gp-lead" data-gap={q5.state==='empty'||undefined}>{q5.text}</p>
-    <p className="gp-inline-ladder"><span>In this library: {inLibrary.length?inLibrary.join(', '):'nothing yet'}</span><span>Not in this library yet: {missing.length?missing.join(', '):'nothing missing'}</span></p>
+    <p className="c-note">{rows.length} source-bound {rows.length===1?'finding':'findings'} extracted automatically for {entity.name}, kept separate from the curated reading above. Not expert-reviewed.</p>
+    {scope&&<p className="c-body">{scope}</p>}
+    {q4.map(group=><p className="c-body gp-kind-note" key={group.kind}><b>{group.label}.</b> {group.sentences.join(' ')}</p>)}
+    {table.rows.length>0&&<AccuracyFigures table={table} strip={EMPTY_STRIP}/>}
+    {strip.points.length>0&&<AccuracyFigures table={EMPTY_TABLE} strip={strip}/>}
+    <FindingLedger rows={ledgerRows} onInspect={setInspecting} activeId={inspecting?.id}
+      caption={`Graph findings indexed for ${entity.name}.`}/>
+    <p className="c-body" data-gap={q5.state==='empty'||undefined}>{q5.text}</p>
+    <p className="c-note gp-inline-ladder">
+      <span>In this library: {inLibrary.length?inLibrary.join(', '):'nothing yet'}</span>
+      <span>Not in this library yet: {missing.length?missing.join(', '):'nothing missing'}</span>
+    </p>
+    {inspecting&&<Inspector finding={inspecting} onClose={()=>setInspecting(null)} entityName={entity.name}/>}
   </section>;
 }
 
@@ -131,125 +125,256 @@ function Diagnosis(){
   return <p role="status">{said}</p>;
 }
 
+
+// Short rail labels. The questions themselves stay as written in the contract; the rail needs a
+// handful of words a reader can scan, and "Q1" was our word for it, not theirs.
+const SHORT={
+  biomarker:['What it is','Biology','Measurement','Findings','Does it help'],
+  diagnostic:['What it is','What it detects','Reliability','Accuracy','Does it help'],
+  screening:['What it is','What it looks for','Reliability','Accuracy','Does it help'],
+  precision_oncology:['The modifier','Biology','Measurement','Prognostic or predictive','Does it help'],
+};
+const RUNG_SLOTS=[0,1,2,3,4,5];
+
+function jumpTo(id){
+  const target=document.getElementById(id);
+  if(!target)return;
+  const smooth=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  target.scrollIntoView({block:'start',behavior:smooth?'smooth':'auto'});
+  target.focus?.({preventScroll:true});
+}
+
+function Section({id,n,label,question,count,children}){
+  return <section className="gp-section" id={id} aria-labelledby={`${id}-h`}>
+    <div className="gp-section-head">
+      <h2 id={`${id}-h`} tabIndex={-1}>{question}</h2>
+      {count!=null&&count>0&&<span className="gp-section-count c-num">{count}</span>}
+    </div>
+    {children}
+  </section>;
+}
+
+// The three-pane reading frame: where you are in the page, the reading itself, and the source you
+// are inspecting — none of which should make the others move.
+function ProfileFrame({go,index,back,name,type,sections,related,inspecting,onClose,entityName,children}){
+  const [here,setHere]=useState(sections?.[0]?.id);
+  useEffect(()=>{
+    if(!sections)return undefined;
+    const nodes=sections.map(s=>document.getElementById(s.id)).filter(Boolean);
+    if(!nodes.length||typeof IntersectionObserver==='undefined')return undefined;
+    const seen=new Map();
+    const observer=new IntersectionObserver(entries=>{
+      for(const entry of entries)seen.set(entry.target.id,entry.intersectionRatio);
+      const best=[...seen.entries()].filter(([,ratio])=>ratio>0).sort((a,b)=>b[1]-a[1])[0];
+      if(best)setHere(best[0]);
+    },{rootMargin:'-70px 0px -55% 0px',threshold:[0,0.25,0.6]});
+    for(const node of nodes)observer.observe(node);
+    return()=>observer.disconnect();
+  },[sections]);
+
+  const crumbs=name?[{label:'Library',to:'/explore'},{label:back?.replace(/^All /,'')||'Biomarkers',to:index},{label:name}]:null;
+  return <div className="gp-frame" data-inspecting={inspecting?true:undefined}>
+    <nav className="gp-rail" aria-label="On this page">
+      {sections&&<>
+        <p className="gp-rail-title">On this page</p>
+        <ol>{sections.map(s=><li key={s.id}>
+          <a href={`#${s.id}`} aria-current={here===s.id?'true':undefined}
+             onClick={e=>{e.preventDefault();jumpTo(s.id);}}>
+            <span className="gp-rail-n">{s.n}</span>{s.label}
+            {s.count!=null&&s.count>0&&<span className="gp-rail-count c-num">{s.count}</span>}
+          </a></li>)}</ol>
+      </>}
+      {related&&related.length>0&&<>
+        <p className="gp-rail-title">Related entities</p>
+        <ul className="gp-rail-related">{related.slice(0,6).map(r=>{const to=graphPath(r.id);return <li key={r.edge+r.id}>
+          {to?<Link to={to} go={go}>{r.name}</Link>:<span>{r.name}</span>}</li>;})}</ul>
+      </>}
+    </nav>
+    <div className="gp-column">
+      {crumbs&&<Crumbs items={crumbs} go={go}/>}
+      {children}
+    </div>
+    <Inspector finding={inspecting} onClose={onClose} entityName={entityName}/>
+  </div>;
+}
+
 export default function GraphProfile({slug,go,type='biomarker'}){
   const [attempt,setAttempt]=useState(0);
+  const [inspecting,setInspecting]=useState(null);
   const state=useGraphEntity(slug,type,attempt);
+  const [index,back]=INDEX[type]||INDEX.biomarker;
 
-  if(state.status==='loading'||state.status==='retrying')return <div className="gp" aria-busy="true"><div className="ev-hero"><div className="ev-eyebrow">BIOMARKERS / GRAPH PROFILE · AUTOMATED</div><div className="gp-skeleton gp-skeleton-title"/><div className="gp-skeleton"/></div><ul className="gp-layers" aria-hidden="true">{LAYERS.map(l=><li key={l} className="gp-layer gp-layer-skeleton"/>)}</ul><p className="ev-note" role="status">{state.status==='retrying'?'The evidence engine is waking up. Retrying…':'Loading the graph profile…'}</p></div>;
-  if(state.status==='missing')return <div className="gp"><Hero name="Page not found" go={go} type={type}/><section className="ev-panel"><h2>This evidence page does not exist</h2><p>No biomarker in the Clarity graph uses this address.</p><Link to="/biomarkers" go={go}>Return to biomarkers</Link></section></div>;
-  if(state.status==='error')return <div className="gp"><Hero name="Profile unavailable" go={go} type={type}/><section className="ev-panel"><h2>The graph profile could not be loaded</h2><Diagnosis/><button onClick={()=>setAttempt(n=>n+1)}>Try again</button></section></div>;
+  // A new entity is a new set of findings; the panel must not keep showing the last one's passage.
+  useEffect(()=>{setInspecting(null);},[slug,type]);
+
+  if(state.status==='loading'||state.status==='retrying')return <ProfileFrame crumbs={null}>
+    <div className="gp-read" aria-busy="true">
+      <div className="gp-mast"><div className="c-skel" style={{width:'180px',height:'13px'}}/><div className="c-skel" style={{width:'44%',height:'46px',marginTop:'14px'}}/></div>
+      <div className="gp-rungs" aria-hidden="true">{RUNG_SLOTS.map(i=><div className="gp-rung" key={i}><div className="c-skel" style={{width:'70%',height:'11px'}}/><div className="c-skel" style={{width:'36%',height:'18px',marginTop:'8px'}}/></div>)}</div>
+      <p className="c-note" role="status" style={{marginTop:'var(--s5)'}}>{state.status==='retrying'?'The evidence engine is waking up. Retrying…':'Loading this profile…'}</p>
+    </div>
+  </ProfileFrame>;
+
+  if(state.status==='missing')return <ProfileFrame>
+    <div className="gp-read"><div className="gp-mast"><h1>Page not found</h1></div>
+      <p className="c-lede">No entity in the Clarity graph uses this address.</p>
+      <p style={{marginTop:'var(--s4)'}}><Link className="c-btn" to={index} go={go}>{back}</Link></p></div>
+  </ProfileFrame>;
+
+  if(state.status==='error')return <ProfileFrame>
+    <div className="gp-read"><div className="gp-mast"><h1>Profile unavailable</h1></div>
+      <div className="c-notice" data-tone="caution"><Diagnosis/></div>
+      <p style={{marginTop:'var(--s4)'}}><button type="button" className="c-btn" onClick={()=>setAttempt(n=>n+1)}>Try again</button></p></div>
+  </ProfileFrame>;
 
   const {entity,layers,findings,related,studies,dead_letters:dead}=state.data;
   const stale=freshness(state.data),quoted=quotedRows(state.data);
-  const total=flatten(findings).length,strip=aucStrip(findings),table=classificationRows(findings);
+  const all=flatten(findings),total=all.length,strip=aucStrip(findings),table=classificationRows(findings);
   const q1=identity(entity,related),q2=biology(entity,findings),q3=measurement(entity,findings),q4=meaning(entity,findings),q5=utility(entity,findings);
   const rungs=ladder(entity,findings),scope=scopeNote(entity,findings),ask=questions(type),links=externalLinks(entity),ucsc=ucscLink(entity);
+  const badge=kindBadge(entity);
+  // Every ledger row carries the label of the kind it was grouped under, so the table can say it.
+  const ledgerRows=q4.flatMap(group=>group.rows.map(row=>({...row,kindLabel:group.label})));
+  const q2Rows=q2.findings.map(row=>({...row,kindLabel:'Mechanism'}));
+  const q5Rows=q5.rows.map(row=>({...row,kindLabel:'Utility'}));
+  const indexedRungs=rungs.filter(r=>r.indexed).length;
+
   const download=(text,mime,extension)=>{
     const url=URL.createObjectURL(new Blob([text],{type:mime}));
     const link=Object.assign(document.createElement('a'),{href:url,download:`${entity.id.replace(':','-')}-findings.${extension}`});
     document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
-  return <div className="gp">
-    <Hero name={entity.name} go={go} type={type}>
-      {stale&&<p className="gp-stale" role="status">{stale}</p>}
-      <p className="ev-intro">{q1.text}{q1.specimen?` Measured in ${q1.specimen.toLowerCase()}.`:''} This page answers five questions in order, from what the object is to whether measuring it helps, using only findings indexed in the graph.</p>
-      <dl className="gp-identity">
-        {q1.aliases.length>0&&<div><dt>Also written as</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
-        <div><dt>Linked publications</dt><dd>{studies}</dd></div>
-        <div><dt>Typed findings</dt><dd>{total}</dd></div>
-        {quoted.length>0&&<div><dt>Quoted, not counted</dt><dd>{quoted.length}</dd></div>}
-      </dl>
-    </Hero>
 
-    <section className="gp-section" aria-labelledby="gp-ladder-title">
-      <div className="gp-section-head"><h2 id="gp-ladder-title">How far the evidence goes</h2><p className="ev-note">A rung is indexed only when a finding in this graph speaks to it. Not indexed means Clarity holds nothing, not that nothing exists.</p></div>
-      <ol className="gp-ladder">{rungs.map(r=><li key={r.key} data-indexed={r.indexed}>
-        <a href={`#${r.target}`} onClick={event=>{event.preventDefault();document.getElementById(r.target)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});document.getElementById(r.target)?.focus?.({preventScroll:true});}}>
-          <span>{r.label}</span><strong>{r.status}</strong>{r.indexed&&<small>{r.asks}</small>}
-        </a>
-      </li>)}</ol>
-    </section>
+  const sections=[
+    {id:'gp-s1',n:1,label:SHORT[type]?.[0]||'What it is',question:ask[0]},
+    {id:'gp-s2',n:2,label:SHORT[type]?.[1]||'Biology',question:ask[1]},
+    {id:'gp-s3',n:3,label:SHORT[type]?.[2]||'Measurement',question:ask[2]},
+    {id:'gp-s4',n:4,label:SHORT[type]?.[3]||'Findings',question:ask[3],count:total},
+    {id:'gp-s5',n:5,label:SHORT[type]?.[4]||'Does it help',question:ask[4]},
+  ];
 
-    <section className="gp-q" aria-labelledby="gp-q1">
-      <h2 id="gp-q1" tabIndex={-1}><em>Q1</em>{ask[0]}</h2>
-      <p className="gp-lead">{q1.text}</p>
-      {!q1.curated&&<p className="ev-note">No curated class is stored for this entity yet, so this is the generic description for its kind.</p>}
-      {scope&&<p className="gp-scope">{scope}</p>}
-      <dl className="gp-facts">
-        <div><dt>Class</dt><dd>{q1.label}</dd></div>
-        {q1.specimen&&<div><dt>Specimen</dt><dd>{q1.specimen}</dd></div>}
-        {q1.aliases.length>0&&<div><dt>Aliases</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
-      </dl>
-      {(links.length>0||ucsc)&&<div className="gp-ids">
-        <ul>{links.map(link=><li key={link.key}><a href={link.url} target="_blank" rel="noreferrer">{link.label} <code>{link.id}</code></a><small>{link.about}</small></li>)}
-          {ucsc&&<li key="ucsc"><a href={ucsc.url} target="_blank" rel="noreferrer">UCSC <code>{ucsc.position}</code></a><small>{ucsc.about}</small></li>}</ul>
-        <p className="ev-note">{idCaption(entity)}</p>
-      </div>}
-      {q1.molecular.length>0&&<>
-        <p className="ev-note">Gene, protein and variant are separate entities here. A finding about one is never attached to another.</p>
-        <ul className="gp-related">{q1.molecular.map(r=>{const to=graphPath(r.id);return <li key={r.edge+r.id}><span>{relationLabel(r)}</span>{to?<Link to={to} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}<small>{r.kind}</small></li>;})}</ul>
-      </>}
-    </section>
+  return <ProfileFrame
+    go={go} index={index} back={back} name={entity.name} type={type}
+    sections={sections} related={q1.molecular} inspecting={inspecting}
+    onClose={()=>setInspecting(null)} entityName={entity.name}>
+    <div className="gp-read">
+      <div className="gp-mast">
+        <div className="gp-mast-main">
+          <p className="gp-kindline">
+            <span className="c-tag" data-tone="indexed">{kindWords(entity.kind)}</span>
+            {q1.aliases.length>0&&<span className="c-note" style={{display:'inline'}}>also written {q1.aliases.slice(0,3).join(' · ')}</span>}
+          </p>
+          <h1 tabIndex={-1} id="gp-title">{entity.name}</h1>
+        </div>
+        {(links.length>0||ucsc)&&<dl className="gp-ids">
+          {links.map(link=><div key={link.key}><dt>{link.label}</dt><dd><a href={link.url} target="_blank" rel="noreferrer">{link.id}</a></dd></div>)}
+          {ucsc&&<div key="ucsc"><dt>UCSC</dt><dd><a href={ucsc.url} target="_blank" rel="noreferrer">{ucsc.position}</a></dd></div>}
+        </dl>}
+      </div>
 
-    <section className="gp-q" aria-labelledby="gp-q2">
-      <h2 id="gp-q2" tabIndex={-1}><em>Q2</em>{ask[1]}</h2>
-      {q2.state==='background'&&<p className="gp-badge">Background, not a finding</p>}
-      <p className="gp-lead">{q2.text}</p>
-      {q2.findings.length>0&&<FindingList rows={q2.findings}/>}
-      {q2.state==='indexed'&&q2.note&&<p className="ev-note">Background: {q2.note}</p>}
-    </section>
+      {stale&&<div className="c-notice" data-tone="caution" role="status">{stale}</div>}
 
-    <section className="gp-q" aria-labelledby="gp-q3">
-      <h2 id="gp-q3" tabIndex={-1}><em>Q3</em>{ask[2]}</h2>
-      <p className="gp-lead" data-gap={q3.gap||undefined}>{q3.text}</p>
-      <dl className="gp-facts">
-        {q3.assays.length>0&&<div><dt>Assays named</dt><dd>{q3.assays.join(' · ')}</dd></div>}
-        {q3.units.length>0&&<div><dt>Units reported</dt><dd>{q3.units.join(' · ')}</dd></div>}
-        {q3.method&&<div><dt>Usual method</dt><dd>{q3.method} <span className="ev-note">(background)</span></dd></div>}
-      </dl>
-    </section>
+      <p className="c-lede gp-scope">
+        {studies} linked {studies===1?'publication':'publications'}; {total} {total===1?'finding carries':'findings carry'} a reported estimate.
+        {scope?` ${scope}`:''}
+      </p>
 
-    <section className="gp-q" aria-labelledby="gp-q4">
-      <h2 id="gp-q4" tabIndex={-1}><em>Q4</em>{ask[3]}</h2>
-      {q4.length===0&&<p className="gp-lead">No typed finding is indexed for {entity.name}, so this page supports no claim about what its value indicates.</p>}
-      {q4.map(g=><div className="gp-kind" key={g.kind}>
-        <h3>{g.label}<span>{g.rows.length}</span></h3>
-        {g.sentences.map(sentence=><p className="gp-meaning" key={sentence}>{sentence}</p>)}
-        {g.kind==='classification'&&<AccuracyFigures table={table} strip={EMPTY_STRIP}/>}
-        {g.kind==='discrimination'&&<AccuracyFigures table={EMPTY_TABLE} strip={strip}/>}
-        <FindingList rows={g.rows}/>
-      </div>)}
-      {total>0&&<p className="gp-export">The whole profile as one file: <button type="button" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button> <button type="button" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button> <span className="ev-note">One row per finding, with its passage, source and review state. The workspace below takes a filtered selection instead.</span></p>}
-      {quoted.length>0&&<details className="gp-quoted">
-        <summary>Quoted from other papers — not counted toward this marker ({quoted.length})</summary>
-        <p className="ev-note">This paper repeated {quoted.length===1?'this number':'these numbers'} from work it cited. {quoted.length===1?'It is':'They are'} not {entity.name} {quoted.length===1?'evidence':'evidence'} from this study, {quoted.length===1?'counts':'count'} toward nothing on this page, and {quoted.length===1?'is':'are'} shown only so the passage is not hidden.</p>
-        <ul className="gp-findings">{quoted.map(r=><li key={r.id}>
-          <div className="gp-finding-head"><strong>{valueText(r)}</strong><span>{[r.target&&`for ${r.target}`,r.population].filter(Boolean).join(' · ')}</span></div>
-          {r.quote&&<blockquote>{r.quote}</blockquote>}
-          <small>{r.pmid?<a href={`https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`} target="_blank" rel="noreferrer">PMID {r.pmid}</a>:'Source'}{r.year?` · ${r.year}`:''} · quoted, not measured here</small>
-        </li>)}</ul>
+      <div className="gp-rungs" role="group" aria-label="How far the indexed evidence goes">
+        {rungs.map(r=><a className="gp-rung" key={r.key} data-indexed={r.indexed||undefined} href={`#${r.target}`}
+          onClick={e=>{e.preventDefault();jumpTo(r.target);}}>
+          <span className="gp-rung-label">{r.label}</span>
+          <strong>{r.indexed?'indexed':'not indexed'}</strong>
+          {r.indexed&&<small>{r.asks}</small>}
+        </a>)}
+      </div>
+      <p className="c-note">{indexedRungs} of {rungs.length} rungs hold something. Not indexed means Clarity holds nothing here, not that nothing exists.</p>
+
+      <Section {...sections[0]}>
+        <p className="c-body">{q1.text}{q1.specimen?` Measured in ${q1.specimen.toLowerCase()}.`:''}</p>
+        {!q1.curated&&<p className="c-note">No curated class is stored for this entity yet, so this is the generic description for its kind.</p>}
+        <dl className="gp-facts">
+          <div><dt>Class</dt><dd>{q1.label}</dd></div>
+          {q1.specimen&&<div><dt>Specimen</dt><dd>{q1.specimen}</dd></div>}
+          {q1.aliases.length>0&&<div><dt>Aliases</dt><dd>{q1.aliases.join(' · ')}</dd></div>}
+        </dl>
+        {(links.length>0||ucsc)&&<p className="c-note">{idCaption(entity)}</p>}
+        {q1.molecular.length>0&&<>
+          <p className="c-note">Gene, protein and variant are separate entities here. A finding about one is never attached to another.</p>
+          <ul className="gp-related">{q1.molecular.map(r=>{const to=graphPath(r.id);return <li key={r.edge+r.id}>
+            <span className="gp-rel-edge">{relationLabel(r)}</span>
+            {to?<Link to={to} go={go}>{r.name}</Link>:<strong>{r.name}</strong>}
+            <span className="gp-rel-kind">{r.kind}</span>
+          </li>;})}</ul>
+        </>}
+      </Section>
+
+      <Section {...sections[1]}>
+        {q2.state==='background'&&<p className="c-tag" data-tone="caution" style={{display:'inline-flex',marginBottom:'var(--s3)'}}>background, not a finding</p>}
+        <p className="c-body">{q2.text}</p>
+        {q2Rows.length>0&&<FindingLedger rows={q2Rows} onInspect={setInspecting} activeId={inspecting?.id}
+          caption={`Mechanism and preclinical findings indexed for ${entity.name}.`}/>}
+        {q2.state==='indexed'&&q2.note&&<p className="c-note">Background: {q2.note}</p>}
+      </Section>
+
+      <Section {...sections[2]}>
+        <p className="c-body" data-gap={q3.gap||undefined}>{q3.text}</p>
+        <dl className="gp-facts">
+          {q3.assays.length>0&&<div><dt>Assays named</dt><dd>{q3.assays.join(' · ')}</dd></div>}
+          {q3.units.length>0&&<div><dt>Units reported</dt><dd>{q3.units.join(' · ')}</dd></div>}
+          {q3.method&&<div><dt>Usual method</dt><dd>{q3.method} <span className="c-note" style={{display:'inline'}}>(background)</span></dd></div>}
+        </dl>
+      </Section>
+
+      <Section {...sections[3]}>
+        {total===0
+          ? <div className="c-gap"><strong>No typed finding is indexed for {entity.name}.</strong>
+              <p>This page supports no claim about what its value indicates. That is a statement about this library, not about the literature.</p></div>
+          : <>
+            {q4.map(group=><p className="c-body gp-kind-note" key={group.kind}><b>{group.label}.</b> {group.sentences.join(' ')}</p>)}
+            {table.rows.length>0&&<AccuracyFigures table={table} strip={EMPTY_STRIP}/>}
+            {strip.points.length>0&&<AccuracyFigures table={EMPTY_TABLE} strip={strip}/>}
+            <FindingLedger rows={ledgerRows} onInspect={setInspecting} activeId={inspecting?.id}
+              caption={`Every typed finding indexed for ${entity.name}, with its estimate, interval, population, provenance and source.`}/>
+            <p className="gp-export">
+              <button type="button" className="c-btn c-btn--sm" onClick={()=>download(findingsCsv(entity,findings),'text/csv','csv')}>Download CSV</button>
+              <button type="button" className="c-btn c-btn--sm" onClick={()=>download(findingsJson(entity,findings,layers),'application/json','json')}>Download JSON</button>
+              <span className="c-note" style={{display:'inline'}}>One row per finding, with its passage, source and review state.</span>
+            </p>
+          </>}
+        {quoted.length>0&&<details className="gp-fold">
+          <summary>Quoted from other papers — not counted toward {entity.name} ({quoted.length})</summary>
+          <p className="c-note">{quoted.length===1?'This number was':'These numbers were'} repeated from work the paper cited. {quoted.length===1?'It is':'They are'} not evidence from this study, count toward nothing on this page, and are shown only so the passage is not hidden.</p>
+          <FindingLedger rows={quoted.map(r=>({...r,kindLabel:'Quoted'}))} onInspect={setInspecting} activeId={inspecting?.id}
+            caption="Numbers this paper repeated from its own citations."/>
+        </details>}
+      </Section>
+
+      <Section {...sections[4]}>
+        {q5.state==='empty'
+          ? <div className="c-gap"><strong>{q5.text}</strong>
+              <p>A utility finding is one where the measurement changed what was done and the outcome was followed. Nothing here reports that.</p></div>
+          : <p className="c-body">{q5.text}</p>}
+        {q5Rows.length>0&&<FindingLedger rows={q5Rows} onInspect={setInspecting} activeId={inspecting?.id}
+          caption={`Utility findings indexed for ${entity.name}.`}/>}
+      </Section>
+
+      {dead.length>0&&<details className="gp-fold">
+        <summary>{dead.length} extraction {dead.length===1?'attempt':'attempts'} produced no typed finding</summary>
+        <ul className="gp-dead-list">{dead.map(d=><li key={`${d.pmid}-${d.at}`}>{d.pmid?`PMID ${d.pmid}`:'Source'}: {deadLetterText(d)}.</li>)}</ul>
+        <p className="c-note">Recorded so the next extraction pass knows why. A rejected passage is not evidence against {entity.name}.</p>
       </details>}
-    </section>
 
-    <section className="gp-q" aria-labelledby="gp-q5">
-      <h2 id="gp-q5" tabIndex={-1}><em>Q5</em>{ask[4]}</h2>
-      <p className="gp-lead" data-gap={q5.state==='empty'||undefined}>{q5.text}</p>
-      {q5.rows.length>0&&<FindingList rows={q5.rows}/>}
-    </section>
+      {total>0&&<div className="gp-workspace">
+        <FindingsWorkspace
+          result={{entities:[{id:entity.id,name:entity.name}],graph_findings:all.map(f=>({...f,entity_id:entity.id}))}}
+          estimates={[]} letter="F" title={`Every ${entity.name} finding in one table`} context="profile" subject={entity.name}
+          briefs={[{name:entity.name,missing:rungs.filter(r=>!r.indexed).map(r=>r.label)}]}
+          intro="Filter this profile's findings by kind, layer or measure, take the rows you need, and copy a methods sentence that states what this library did and did not hold."/>
+      </div>}
 
-    {dead.length>0&&<details className="gp-dead"><summary>{dead.length} extraction {dead.length===1?'attempt':'attempts'} produced no typed finding</summary>
-      <ul>{dead.map(d=><li key={`${d.pmid}-${d.at}`}>{d.pmid?`PMID ${d.pmid}`:'Source'}: {deadLetterText(d)}.</li>)}</ul>
-      <p className="ev-note">Recorded so the next extraction pass knows why. A rejected passage is not evidence against {entity.name}.</p>
-    </details>}
-
-    {total>0&&<FindingsWorkspace
-      result={{entities:[{id:entity.id,name:entity.name}],graph_findings:flatten(findings).map(f=>({...f,entity_id:entity.id}))}}
-      estimates={[]} letter="F" title={`Every ${entity.name} finding in one table`} context="profile" subject={entity.name}
-      briefs={[{name:entity.name,missing:rungs.filter(r=>!r.indexed).map(r=>r.label)}]}
-      intro="Filter this profile's findings by kind, layer or measure, take the rows you need, and copy a methods sentence that states what this library did and did not hold."/>}
-
-    <p className="ev-note gp-foot">Automated graph profile built from published abstracts, with curated identity text marked as background. It describes what studies report and is not a clinical decision or individual risk tool.</p>
-  </div>;
+      <p className="c-note gp-foot">{badge.text}. Built from published abstracts, with curated identity text marked as background. It describes what studies report and is not a clinical decision or individual risk tool.</p>
+    </div>
+  </ProfileFrame>;
 }
 
 // Graph biomarkers from /api/library that the bundled catalog does not profile, as browsable cards.
