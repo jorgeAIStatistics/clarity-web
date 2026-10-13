@@ -1,16 +1,16 @@
 /* Epistemic status chips. Marks carry meaning with the label; colors come from the validated palette. */
-.es-chip{display:inline-flex;align-items:center;gap:7px;font:500 12px/1.2 Inter,system-ui,sans-serif;padding:5px 10px;border-radius:999px;border:1px solid #3a4a5e;color:#d5deea;background:#101923;white-space:nowrap;vertical-align:middle}
+.es-chip{display:inline-flex;align-items:center;gap:7px;font:500 12px/1.2 Inter,system-ui,sans-serif;padding:5px 10px;border-radius:999px;border:1px solid var(--hairline-strong);color:var(--ink);background:#101923;white-space:nowrap;vertical-align:middle}
 .es-chip::before{content:'';flex:none;width:9px;height:9px;border-radius:2px}
-.es-established::before{background:#52c1a4}
-.es-reviewed::before{background:#52c1a4;border-radius:50%}
-.es-uncertain::before{background:#2f7566;box-shadow:inset 0 0 0 1px #52c1a4}
+.es-established::before{background:var(--accent)}
+.es-reviewed::before{background:var(--accent);border-radius:50%}
+.es-uncertain::before{background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--accent)}
 .es-conflicting::before{width:7px;height:7px;border:2px solid #d8406a;border-radius:50%}
-.es-unappraised::before{background:repeating-linear-gradient(45deg,#9aa9bd 0 1.5px,transparent 1.5px 4px)}
-.es-not_reported::before{content:'NR';width:auto;height:auto;font:600 9px/1 'JetBrains Mono',ui-monospace,monospace;color:#9aa9bd}
-.es-not_extracted::before{height:2px;background:#9aa9bd}
-.es-not_assessed::before{width:8px;height:8px;border:1.5px solid #9aa9bd;background:transparent}
-.es-not_searched::before{border:1.5px dotted #9aa9bd}
-.es-searched_none_found::before{width:12px;height:2px;background:#c3cfdd}
+.es-unappraised::before{background:repeating-linear-gradient(45deg,var(--ink-subtle) 0 1.5px,transparent 1.5px 4px)}
+.es-not_reported::before{content:'NR';width:auto;height:auto;font:600 9px/1 'JetBrains Mono',ui-monospace,monospace;color:var(--ink-subtle)}
+.es-not_extracted::before{height:2px;background:var(--ink-subtle)}
+.es-not_assessed::before{width:8px;height:8px;border:1.5px solid var(--ink-subtle);background:transparent}
+.es-not_searched::before{border:1.5px dotted var(--ink-subtle)}
+.es-searched_none_found::before{width:12px;height:2px;background:var(--ink-muted)}
 .es-legacy{border-style:dashed}
-.es-legacy::before{border:1.5px solid #9aa9bd;border-radius:50%;background:transparent}
+.es-legacy::before{border:1.5px solid var(--ink-subtle);border-radius:50%;background:transparent}
 @media (forced-colors:active){.es-chip{border-color:CanvasText}.es-chip::before{border-color:CanvasText}}

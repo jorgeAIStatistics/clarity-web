@@ -1,6 +1,6 @@
 import React from 'react';
 import './platform.css';
-export default function PlatformMethodology(){return <section className="profile-brief" lang="en"><p className="hp-eyebrow">AUTOMATED / SOURCE-BOUND / REPRODUCIBLE</p><h2>What every plotted estimate must pass</h2><div className="knowledge-grid">{[
+export default function PlatformMethodology(){return <section className="profile-brief" lang="en"><h2>What every plotted estimate must pass</h2><div className="knowledge-grid">{[
  ['Source identity','A PubMed identifier, canonical source URL, retained abstract, SHA-256 source hash and exact source passage.'],
  ['Numerical integrity','Finite reported values, valid measure bounds, ordered intervals and a reported confidence level. Missing intervals remain missing.'],
  ['Scientific context','A named endpoint, population, exposure and comparator, with retained population and study-context passages. Association, prediction, diagnostic performance and intervention outcomes remain separate.'],

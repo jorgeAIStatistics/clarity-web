@@ -1,0 +1,59 @@
+/* The library is a list of records to scan, not a wall of cards. Every row answers the same four
+   questions in the same four places: what it is, what was studied, how much is quotable, how it
+   was reviewed. */
+.lib-head{margin-bottom:var(--s5)}
+.lib-head h1{margin-bottom:var(--s3)}
+
+.lib-controls{
+  display:grid;grid-template-columns:minmax(220px,2fr) repeat(3,minmax(130px,1fr));
+  gap:var(--s3);align-items:end;margin-bottom:var(--s4);
+}
+.lib-search{min-width:0}
+
+.lib-facets{display:flex;flex-wrap:wrap;gap:var(--s2);margin-bottom:var(--s4)}
+
+.lib-status{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s2)}
+.lib-status p{font-size:var(--text-small);color:var(--ink)}
+
+.lib-rows{display:flex;flex-direction:column;margin-top:var(--s4);border-top:1px solid var(--hairline)}
+.lib-row{
+  display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1.5fr) 232px 148px;
+  gap:var(--s3) var(--s5);align-items:start;
+  padding:var(--s4) var(--s3);border-bottom:1px solid var(--hairline);
+  color:var(--ink);text-decoration:none;
+  transition:background var(--fast) var(--ease),box-shadow var(--fast) var(--ease);
+}
+.lib-row:hover{background:var(--surface-1);text-decoration:none;box-shadow:inset 2px 0 0 var(--accent)}
+.lib-row:focus-visible{background:var(--surface-1)}
+.lib-row--skel{pointer-events:none}
+
+.lib-id{min-width:0}
+.lib-type{display:block;font-size:var(--text-micro);color:var(--ink-subtle);margin-bottom:4px}
+.lib-id h3{font-size:var(--text-sub);font-weight:600;overflow-wrap:anywhere}
+.lib-alias{font-size:var(--text-micro);color:var(--ink-faint);margin-top:3px;overflow-wrap:anywhere}
+
+.lib-outcomes{font-size:var(--text-fine);line-height:1.5;color:var(--ink-muted);min-width:0;overflow-wrap:anywhere}
+.lib-none{color:var(--ink-faint)}
+
+.lib-figures{display:flex;flex-direction:column;gap:4px}
+.lib-figure{font-size:var(--text-micro);color:var(--ink-subtle);display:flex;gap:6px;align-items:baseline}
+.lib-figure b{font-size:var(--text-small);color:var(--ink-muted);font-weight:500;min-width:2.2ch;text-align:right}
+/* Only the quotable count earns emphasis; a large publication count is not a stronger finding. */
+.lib-figure[data-present] b{color:var(--indexed)}
+
+.lib-state{display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.lib-state small{font-size:var(--text-micro);color:var(--ink-faint);line-height:1.4}
+
+.lib-pages{display:flex;align-items:center;gap:var(--s4);margin-top:var(--s5)}
+
+@media (max-width:1080px){
+  .lib-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--s2) var(--s5)}
+  .lib-figures{grid-column:1;flex-direction:row;gap:var(--s4)}
+  .lib-state{grid-column:2;align-items:flex-end;text-align:right}
+}
+@media (max-width:760px){
+  .lib-controls{grid-template-columns:1fr 1fr}
+  .lib-search{grid-column:1/-1}
+  .lib-row{grid-template-columns:minmax(0,1fr);padding:var(--s4) var(--s2)}
+  .lib-figures,.lib-state{grid-column:1;flex-direction:row;align-items:baseline;text-align:left;gap:var(--s4);flex-wrap:wrap}
+}

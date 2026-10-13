@@ -1,4 +1,5 @@
 import PlatformLearn from './platform/PlatformLearn.jsx';
+import Shell from './design/Shell.jsx';
 import {canonicalPath} from './platform/routes.js';
 import Library from "./platform/Library.jsx";
 import {API_BASE} from "./platform/api.js";
@@ -928,22 +929,13 @@ function ResearchTab({ langState, initialRequest, onHome, onLearn, onProfileOpen
         @media (max-width: 420px){ .tagline { display:none; } .study-matrix{grid-template-columns:repeat(10,minmax(0,1fr)) !important;} }
       `}</style>
 
-      {/* Sticky top bar. Back stays visible while reading any deep page. */}
-      <div style={{ borderBottom: `1px solid ${LINE}`, padding: "10px 20px", minHeight: 50, display: "flex", alignItems: "center", gap: 11, position: "sticky", top: 0, background: `${INK}F2`, backdropFilter: "blur(12px)", WebkitBackdropFilter:"blur(12px)", zIndex: 55 }}>
-        {(showProfile || showMethod) ? (
-          <motion.button aria-label={langState[0] === "es" ? "Volver" : "Back"} whileHover={{ x:-2 }} whileTap={{ scale:.96 }} onClick={closeDeepView}
-            style={{ width:34, height:34, borderRadius:10, display:"grid", placeItems:"center", flexShrink:0, cursor:"pointer", background:"rgba(255,255,255,.035)", border:`1px solid ${LINE}`, color:TEXT }}>
-            <ArrowLeft size={16}/></motion.button>
-        ) : null}
-        <button type="button" aria-label={langState[0] === "es" ? "Ir al inicio" : "Go home"} onClick={() => { setActive(null); setNotFound(null); if (onHome) onHome(); }} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", border:0, background:"transparent", padding:0, color:"inherit" }}>
-          <div style={{ width: 25, height: 25, borderRadius: 7, background: `linear-gradient(135deg,${TEAL},${TEAL_DIM})`, display: "grid", placeItems: "center" }}>
-            <Activity size={14} color={INK} strokeWidth={2.6} />
-          </div>
-          <span style={{ fontWeight: 800, letterSpacing: -0.4, fontSize: 16 }}>Clarity</span>
+      {/* One contextual bar. The brand, the sections and the search live in the app shell above;
+          what belongs here is the way back out of a deep page. */}
+      {(showProfile || showMethod) && <div className="rt-bar">
+        <button type="button" className="c-btn c-btn--sm" onClick={closeDeepView}>
+          <ArrowLeft size={14}/>{langState[0] === "es" ? "Volver al catálogo" : "Back to the catalog"}
         </button>
-        <span className="tagline" style={{ paddingLeft: 11, borderLeft: `1px solid ${LINE}`, fontFamily: DISPLAY, fontSize: 12, fontWeight: 500, color: MUTE, letterSpacing: 0.1 }}>{guide.top_tagline}</span>
-        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}><TopNavLinks active="research" onHome={onHome} onResearch={closeDeepView} onLearn={()=>onLearn?.("basics")} lang={langState[0]}/><GuideLanguageToggle langState={langState}/></div>
-      </div>
+      </div>}
 
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "0 22px" }}>
 
@@ -2365,14 +2357,15 @@ function ProfileView({view,onLearn}) {
 // Legacy profile/regimen prototype removed from the production bundle.
 
 function GuideLanguageToggle({ langState }) {
+  // The selected language paints its own background rather than sitting over a positioned layer:
+  // a contrast checker, and a forced-colors mode, can only read the colour the button actually has.
   return (
-    <div style={{ display: "flex", gap: 4, padding: 3, borderRadius: 10, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.025)" }}>
-      {[["en", "EN"], ["es", "ES"]].map(([code, label]) => (
-        <motion.button key={code} whileTap={{ scale: 0.94 }} onClick={() => langState[1](code)} style={{ border: "none", cursor: "pointer", padding: "5px 9px", borderRadius: 7, fontFamily: MONO, fontSize: 10.5, fontWeight: 700, position:"relative", overflow:"hidden",
-          color: langState[0] === code ? INK : MUTE, background: "transparent" }}>
-          {langState[0] === code ? <motion.span layoutId="guide-language-active" transition={MOTION_SPRING} style={{ position:"absolute", inset:0, borderRadius:7, background:TEAL, zIndex:0 }} /> : null}
-          <span style={{ position:"relative", zIndex:1 }}>{label}</span>
-        </motion.button>
+    <div className="lang-toggle" role="group" aria-label="Language">
+      {[["en", "EN", "English"], ["es", "ES", "Español"]].map(([code, label, full]) => (
+        <button key={code} type="button" className="lang-toggle-btn" aria-pressed={langState[0] === code}
+          onClick={() => langState[1](code)} title={full}>
+          <span aria-hidden="true">{label}</span><span className="c-sr">{full}</span>
+        </button>
       ))}
     </div>
   );
@@ -2471,9 +2464,7 @@ function GoalExploreCard({ goal, copy, onResearch, reduceMotion, gradeVersion })
   );
 }
 
-function HomePage({langState,onResearch,onLearn,onHome}) {
-  return <div style={{background:INK,minHeight:"100vh",color:TEXT}}><GuideTopBar langState={langState} onResearch={onResearch} onHome={onHome} onLearn={onLearn} active="home"/><PlatformHome/></div>;
-}
+function HomePage() { return <PlatformHome/>; }
 
 function LearnPage({ langState, initialSection, onResearch, onHome, onLearn }) {
   const c = guideCopy(langState[0]);
@@ -2691,43 +2682,44 @@ export default function Clarity() {
     { k:"learn", label:c.nav_learn, icon:FlaskConical },
   ];
 
+  const go=(path='/explore')=>{
+    const canonical=canonicalPath(path);
+    if(isEvidencePath(canonical)){goEvidence(canonical);return;}
+    if(canonical==='/')return goHome();
+    if(canonical==='/research')return goResearchRoot();
+    if(canonical==='/methodology')return goMethodology();
+    if(canonical.startsWith('/learn'))return goLearn(canonical==='/learn/evidence'?'evidence':'basics');
+    if(canonical==='/privacy')return goPrivacy();
+    if(canonical==='/terms')return goTerms();
+    window.location.href=path;
+  };
+  const section=tab==='explore'
+    ?(evidencePath==='/explore/matcher'?'match':evidencePath==='/explore/compare'?'compare':'library')
+    :tab==='learn'?'learn':tab==='research'?'library':undefined;
+
   return (
     <LangContext.Provider value={langState}>
-      <div onClickCapture={handleNavigationClick} style={{ minHeight:"100vh", background:INK, color:TEXT, fontFamily:DISPLAY }}>
-        <style>{`
-          :focus-visible{outline:2px solid ${TEAL}!important;outline-offset:3px}
-          button:focus-visible,input:focus-visible,a:focus-visible{box-shadow:0 0 0 4px rgba(52,224,190,.12)}
-          @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto!important}}
-          .mobile-bottom-nav{display:none!important}.desktop-top-nav{display:flex!important}
-          @media(max-width:760px){.mobile-bottom-nav{display:flex!important}.desktop-top-nav{display:none!important}.page-with-mobile-dock{padding-bottom:124px!important}}
-        `}</style>
-        <div data-route-surface className="page-with-mobile-dock" style={{ paddingBottom:40 }}>
-          <React.Fragment>
-            {tab === "home" ? <div key="home-page" style={{width:"100%"}}><HomePage langState={langState} onResearch={goResearch} onLearn={goLearn} onHome={goHome} onEvidence={goEvidence}/></div> : null}
-            {tab === "learn" ? <div key="learn-page" style={{width:"100%"}}><PlatformLearn/></div> : null}
-            {tab === "not-found" && <main className="profile-brief"><h1>Page not found</h1><p>This address does not match a Clarity page.</p><a href="/explore">Search the evidence library →</a></main>}
-            {tab === "privacy" ? <div key="privacy-page" style={{width:"100%"}}><PolicyPage kind="privacy" onHome={goHome} onMethodology={goMethodology}/></div> : null}
-            {tab === "terms" ? <div key="terms-page" style={{width:"100%"}}><PolicyPage kind="terms" onHome={goHome} onMethodology={goMethodology}/></div> : null}
-          </React.Fragment>
-          {tab === "explore" && <React.Suspense fallback={<p role="status" style={{padding:32}}>Loading evidence library…</p>}><EvidenceExplorer path={evidencePath} go={goEvidence} onHome={goHome} onResearch={goResearchRoot}/></React.Suspense>}
-          {researchVisited && <div style={{display:tab === "research"?"block":"none",width:"100%"}}><ResearchTab langState={langState} initialRequest={researchRequest} onHome={goHome} onLearn={goLearn} onProfileOpen={onProfileOpen} onResearchRoot={goResearchRoot} onMethodologyOpen={goMethodology} onEvidence={goEvidence}/></div>}
+      <div onClickCapture={handleNavigationClick} data-route-surface>
+        {/* The explorer brings its own shell so a profile can use the whole window. */}
+        {tab === "explore" && <React.Suspense fallback={<Shell go={go} section="library"><p role="status" className="c-note">Loading the evidence library…</p></Shell>}>
+          <EvidenceExplorer path={evidencePath} go={goEvidence} onHome={goHome} onResearch={goResearchRoot}/>
+        </React.Suspense>}
 
-          <footer style={{ maxWidth:960, margin:"56px auto 0", padding:"20px 24px 8px", borderTop:`1px solid ${LINE}`, display:"flex", justifyContent:"center", flexWrap:"wrap", gap:16, fontFamily:MONO, fontSize:10, color:"#667893" }}>
-            <a href="/methodology" onClick={(e)=>{e.preventDefault();goMethodology();}} style={{color:"inherit",textDecoration:"none"}}>{langState[0]==="es"?"Metodología":"Methodology"}</a>
-            <a href="/privacy" onClick={(e)=>{e.preventDefault();goPrivacy();}} style={{color:"inherit",textDecoration:"none"}}>{langState[0]==="es"?"Privacidad":"Privacy"}</a>
-            <a href="/terms" onClick={(e)=>{e.preventDefault();goTerms();}} style={{color:"inherit",textDecoration:"none"}}>{langState[0]==="es"?"Términos":"Terms"}</a>
-            <span>{langState[0]==="es"?"Investigación y educación · no consejo médico":"Research & education · not medical advice"}</span>
-          </footer>
-        </div>
-
-        <div className="mobile-bottom-nav" style={{ position:"fixed",bottom:0,left:0,right:0,zIndex:60,pointerEvents:"none",padding:"0 14px 12px",display:"flex",justifyContent:"center" }}>
-          <div style={{pointerEvents:"auto",display:"flex",width:"100%",maxWidth:520,padding:5,gap:4,borderRadius:17,background:"rgba(10,13,20,.88)",backdropFilter:"blur(18px)",WebkitBackdropFilter:"blur(18px)",border:"1px solid rgba(255,255,255,.09)",boxShadow:"0 14px 45px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.025)"}}>
-            {tabs.map((item)=>{const Ic=item.icon;const on=tab===item.k;return <motion.button key={item.k} whileHover={reduceMotion?undefined:{y:-1}} whileTap={reduceMotion?undefined:{scale:.97}} transition={MOTION_SPRING} aria-current={on ? "page" : undefined} onClick={()=>item.k==="home"?goHome():item.k==="explore"?goEvidence():item.k==="research"?goResearch(null,null):goLearn("basics")} style={{flex:1,position:"relative",display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"9px 11px",minHeight:42,border:"none",borderRadius:12,cursor:"pointer",background:"transparent",color:on?TEAL:MUTE,overflow:"hidden"}}>
-              {on?<motion.div layoutId="bottom-nav-active-pill" transition={MOTION_SPRING} style={{position:"absolute",inset:0,borderRadius:12,background:"rgba(52,224,190,.095)",border:"1px solid rgba(52,224,190,.22)",boxShadow:"inset 0 0 18px rgba(52,224,190,.03)"}}/>:null}
-              <motion.div animate={on&&!reduceMotion?{scale:1.05}:{scale:1}} transition={MOTION_SPRING} style={{display:"grid",position:"relative",zIndex:1}}><Ic size={17} color={on?TEAL:MUTE}/></motion.div><span style={{fontFamily:MONO,fontSize:10,fontWeight:on?700:500,position:"relative",zIndex:1}}>{item.label}</span>
-            </motion.button>})}
-          </div>
-        </div>
+        {tab !== "explore" && <Shell go={go} section={section} trailing={<GuideLanguageToggle langState={langState}/>}>
+          {tab === "home" && <HomePage/>}
+          {tab === "learn" && <PlatformLearn/>}
+          {tab === "privacy" && <PolicyPage kind="privacy" onHome={goHome} onMethodology={goMethodology}/>}
+          {tab === "terms" && <PolicyPage kind="terms" onHome={goHome} onMethodology={goMethodology}/>}
+          {tab === "not-found" && <div className="c-gap">
+            <strong>This address does not match a Clarity page.</strong>
+            <p>The link may be old, or the profile may never have existed here.</p>
+            <p style={{marginTop:'var(--s3)'}}><a className="c-btn c-btn--sm" href="/explore">Search the library</a></p>
+          </div>}
+          {researchVisited && <div style={{display:tab === "research"?"block":"none",width:"100%"}}>
+            <ResearchTab langState={langState} initialRequest={researchRequest} onHome={goHome} onLearn={goLearn}
+              onProfileOpen={onProfileOpen} onResearchRoot={goResearchRoot} onMethodologyOpen={goMethodology} onEvidence={goEvidence}/>
+          </div>}
+        </Shell>}
       </div>
     </LangContext.Provider>
   );

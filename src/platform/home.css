@@ -1,0 +1,79 @@
+/* The homepage opens on the thing the product does: a search over the real library, the real
+   counts, and one real finding. No slogan over a mock dashboard. */
+.home{display:flex;flex-direction:column;gap:var(--s9);padding-bottom:var(--s7)}
+
+.home-open{
+  display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);
+  gap:var(--s7);align-items:start;padding-top:var(--s6);
+}
+.home-open-text{min-width:0;max-width:640px}
+.home-open h1{font-size:clamp(1.9rem,1.1rem + 2.2vw,2.75rem);max-width:17ch;margin-bottom:var(--s4)}
+.home-sub{font-size:var(--text-sub);max-width:60ch}
+
+.home-search{margin:var(--s5) 0 var(--s5);max-width:560px}
+.home-search-row{display:flex;gap:var(--s2)}
+.home-search-input{height:46px;font-size:var(--text-body)}
+.home-search-row .c-btn{min-height:46px;padding:0 var(--s5);flex:none}
+.home-examples{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2);margin-top:var(--s3)}
+.home-examples .c-chip{text-decoration:none}
+.home-examples .c-chip:hover{text-decoration:none;color:var(--ink)}
+
+.home-counts{display:flex;flex-wrap:wrap;gap:var(--s3) var(--s6);margin:0}
+.home-counts div{display:flex;flex-direction:column-reverse;gap:2px}
+.home-counts dd{margin:0;font:500 var(--text-title)/1 var(--mono);color:var(--ink)}
+.home-counts dt{font-size:var(--text-micro);color:var(--ink-subtle)}
+.home-counts-note{margin-top:var(--s3)}
+
+/* ---- the worked example ------------------------------------------------- */
+.home-example-card{
+  margin:0;border:1px solid var(--hairline);border-radius:var(--radius-lg);
+  background:var(--surface-1);padding:var(--s5);
+}
+.home-example-card figcaption{font-size:var(--text-micro);letter-spacing:.04em;color:var(--ink-subtle);margin-bottom:var(--s4)}
+.home-example-fields{display:grid;gap:var(--s2);margin:0 0 var(--s4)}
+.home-example-fields div{display:grid;grid-template-columns:92px minmax(0,1fr);gap:var(--s3);align-items:baseline}
+.home-example-fields dt{font-size:var(--text-micro);color:var(--ink-subtle)}
+.home-example-fields dd{margin:0;font-size:var(--text-fine);color:var(--ink);overflow-wrap:anywhere}
+.home-example-card .c-quote{font-size:var(--text-fine)}
+.home-example-link{display:inline-block;margin-top:var(--s4);font-size:var(--text-fine)}
+
+/* ---- layers ------------------------------------------------------------- */
+.home-layers{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:var(--s7);align-items:start}
+.home-layers-text h2{max-width:20ch;margin-bottom:var(--s4)}
+
+/* ---- domains: a list of questions, not five numbered cards -------------- */
+.home-domains h2{margin-bottom:var(--s4)}
+.home-domains ul{list-style:none;margin:0;padding:0;border-top:1px solid var(--hairline)}
+.home-domains li{border-bottom:1px solid var(--hairline)}
+.home-domains a{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,.85fr);
+  gap:var(--s3) var(--s5);align-items:baseline;
+  padding:var(--s4) var(--s3);color:var(--ink);text-decoration:none;
+  transition:background var(--fast) var(--ease),box-shadow var(--fast) var(--ease);
+}
+.home-domains a:hover{background:var(--surface-1);text-decoration:none;box-shadow:inset 2px 0 0 var(--accent)}
+.home-domains h3{font-size:var(--text-sub);font-weight:600}
+.home-domain-q{font-size:var(--text-fine);color:var(--ink-muted);line-height:1.5}
+.home-domain-detail{font-size:var(--text-micro);color:var(--ink-faint)}
+
+/* ---- the boundary ------------------------------------------------------- */
+.home-close h2{margin-bottom:var(--s5)}
+.home-close-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s7);margin-bottom:var(--s5)}
+.home-close h3{font-size:var(--text-small);font-weight:600;margin-bottom:var(--s3);color:var(--ink-muted)}
+.home-close ul{margin:0;padding-left:var(--s5);display:grid;gap:var(--s3)}
+.home-close li{font-size:var(--text-small);line-height:1.55;color:var(--ink-muted)}
+.home-close>p{display:flex;flex-wrap:wrap;gap:var(--s3)}
+
+@media (max-width:900px){
+  .home{gap:var(--s8)}
+  .home-open,.home-layers{grid-template-columns:minmax(0,1fr);gap:var(--s6)}
+  .home-domains a{grid-template-columns:minmax(0,1fr);gap:var(--s1)}
+  .home-close-grid{grid-template-columns:minmax(0,1fr);gap:var(--s5)}
+}
+@media (max-width:620px){
+  .home-example-fields div{grid-template-columns:minmax(0,1fr);gap:1px}
+}
+@media (max-width:560px){
+  .home-search-row{flex-wrap:wrap}
+  .home-search-row .c-btn{width:100%}
+}
