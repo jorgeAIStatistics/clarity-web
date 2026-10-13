@@ -1,0 +1,80 @@
+/* Clarity design tokens — the single source of surface, ink, accent, type and motion.
+   Everything else styles THROUGH these. A component that reaches for a literal hex is a bug:
+   it will be right in one place and wrong in the next.
+
+   Three rules this file exists to enforce:
+   1. The accent is for interaction and brand only. Scientific meaning never borrows it.
+   2. Scientific status has its own hues, and is always carried by text or shape as well.
+   3. Surfaces step; they do not glow. One ladder, three hairlines, no gradients as decoration. */
+
+:root{
+  /* ---- surface ladder ------------------------------------------------- */
+  --canvas:#07090C;
+  --surface-1:#0D1116;
+  --surface-2:#131921;
+  --surface-3:#1A222C;
+  --surface-sunken:#05070A;
+  --hairline:#1E2630;
+  --hairline-strong:#2C3743;
+  --hairline-loud:#3B4858;
+
+  /* ---- ink ------------------------------------------------------------- */
+  --ink:#E8EDF2;
+  --ink-muted:#A7B4C2;
+  /* Both of these were below 4.5:1 on the lighter surfaces, which is where small labels,
+     aliases and "not indexed" live. Raised until every ground in the ladder passes AA. */
+  --ink-subtle:#8B98A7;
+  --ink-faint:#7E8D9D;
+
+  /* ---- accent: interaction and brand, nothing else --------------------- */
+  --accent:#3FD9B2;
+  --accent-hover:#6BE8C8;
+  --accent-dim:#1F6E5C;
+  --accent-wash:#102620;
+  --on-accent:#04120E;
+
+  /* ---- scientific status: never the accent, always paired with words ---- */
+  --indexed:#7FA6D9;        /* something is held here */
+  --indexed-wash:#101A26;
+  --caution:#D9A84E;        /* unreported, unclear, wide, cited */
+  --caution-wash:#211B10;
+  --refused:#C2706A;        /* withheld, dead-lettered, refused */
+  --refused-wash:#201413;
+
+  /* ---- type ------------------------------------------------------------ */
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --serif:'IBM Plex Serif',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+
+  --text-display:clamp(2rem,1.3rem + 2.2vw,3.25rem);
+  --text-title:clamp(1.5rem,1.2rem + 1vw,2rem);
+  --text-head:1.3125rem;
+  --text-sub:1.0625rem;
+  --text-body:1rem;
+  --text-small:.875rem;
+  --text-fine:.8125rem;
+  --text-micro:.75rem;
+
+  /* ---- space: one 4px-based scale -------------------------------------- */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px; --s9:96px;
+
+  --radius-sm:4px; --radius:7px; --radius-lg:12px;
+
+  /* ---- motion: small feedback vs panel movement ------------------------ */
+  --ease:cubic-bezier(.2,.7,.3,1);
+  --fast:140ms;    /* hover, press, focus, chip toggle */
+  --medium:220ms;  /* panel, tab, disclosure, inspector */
+
+  /* ---- layout ---------------------------------------------------------- */
+  --measure:68ch;
+  --page-max:1340px;
+  --rail:196px;
+  --inspector:340px;
+  --header-h:52px;
+
+  color-scheme:dark;
+}
+
+@media (prefers-reduced-motion:reduce){
+  :root{--fast:1ms;--medium:1ms}
+}

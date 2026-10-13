@@ -1,0 +1,136 @@
+/* Primitives. Every repeated pattern in the product is built once here and used by class,
+   so a change lands everywhere instead of growing another !important tail. */
+
+*,*::before,*::after{box-sizing:border-box}
+
+html{scroll-behavior:smooth;scrollbar-gutter:stable;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--canvas);color:var(--ink);
+  font:var(--text-body)/1.55 var(--sans);
+  font-synthesis-weight:none;-webkit-font-smoothing:antialiased;
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.02em;text-wrap:balance}
+h1{font-size:var(--text-display);line-height:1.04;letter-spacing:-.035em}
+h2{font-size:var(--text-title);line-height:1.15}
+h3{font-size:var(--text-head);line-height:1.25;letter-spacing:-.012em}
+h4{font-size:var(--text-sub);line-height:1.3;letter-spacing:-.008em}
+p{margin:0}
+
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover);text-decoration:underline;text-underline-offset:3px}
+
+:where(a,button,summary,input,select,textarea,[tabindex]):focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius-sm);
+}
+
+code,kbd,samp{font-family:var(--mono);font-size:.92em}
+
+/* ---- text roles ------------------------------------------------------- */
+.c-lede{font-size:var(--text-sub);line-height:1.6;color:var(--ink-muted);max-width:var(--measure)}
+.c-note{font-size:var(--text-fine);line-height:1.6;color:var(--ink-subtle);max-width:var(--measure)}
+.c-body{line-height:1.62;max-width:var(--measure)}
+.c-mono{font-family:var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.c-num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Source text wears a serif so what a paper said never looks like what Clarity said. */
+.c-quote{
+  font:var(--text-body)/1.72 var(--serif);color:#D4DCE4;
+  margin:var(--s4) 0;padding:2px 0 2px var(--s4);border-left:2px solid var(--accent-dim);
+  max-width:72ch;
+}
+.c-quote mark{background:var(--accent-wash);color:#CFF3E7;padding:0 2px;border-radius:2px}
+
+/* ---- buttons ---------------------------------------------------------- */
+.c-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);
+  min-height:38px;padding:0 var(--s4);border-radius:var(--radius);
+  border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);
+  font:500 var(--text-small)/1 var(--sans);cursor:pointer;text-decoration:none;
+  transition:background var(--fast) var(--ease),border-color var(--fast) var(--ease),color var(--fast) var(--ease);
+}
+.c-btn:hover{background:var(--surface-3);border-color:var(--hairline-loud);color:var(--ink);text-decoration:none}
+.c-btn:active{background:var(--surface-1)}
+.c-btn[disabled],.c-btn[aria-disabled=true]{opacity:.5;cursor:not-allowed}
+.c-btn--primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.c-btn--primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:var(--on-accent)}
+.c-btn--quiet{background:transparent;border-color:transparent;color:var(--ink-muted)}
+.c-btn--quiet:hover{background:var(--surface-2);color:var(--ink)}
+.c-btn--sm{min-height:30px;padding:0 var(--s3);font-size:var(--text-fine)}
+
+/* ---- fields ----------------------------------------------------------- */
+.c-field{
+  width:100%;min-height:38px;padding:var(--s2) var(--s3);
+  background:var(--surface-sunken);color:var(--ink);
+  border:1px solid var(--hairline-strong);border-radius:var(--radius);
+  font:var(--text-small)/1.5 var(--sans);
+  transition:border-color var(--fast) var(--ease);
+}
+.c-field:hover{border-color:var(--hairline-loud)}
+.c-field::placeholder{color:var(--ink-faint)}
+textarea.c-field{min-height:120px;resize:vertical;line-height:1.6}
+.c-label{display:block;font-size:var(--text-micro);letter-spacing:.02em;color:var(--ink-subtle);margin-bottom:var(--s1)}
+
+/* ---- chips: a toggle, never decoration -------------------------------- */
+.c-chip{
+  display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 10px;
+  border:1px solid var(--hairline-strong);border-radius:999px;background:transparent;
+  color:var(--ink-muted);font:var(--text-fine)/1 var(--sans);cursor:pointer;
+  transition:background var(--fast) var(--ease),border-color var(--fast) var(--ease),color var(--fast) var(--ease);
+}
+.c-chip:hover{border-color:var(--hairline-loud);color:var(--ink)}
+.c-chip[aria-pressed=true]{background:var(--accent-wash);border-color:var(--accent-dim);color:var(--accent)}
+.c-chip .c-chip-n{font-family:var(--mono);font-size:var(--text-micro);color:var(--ink-subtle)}
+.c-chip[aria-pressed=true] .c-chip-n{color:var(--accent)}
+
+/* ---- tags: read-only state, shape + word, never colour alone ---------- */
+.c-tag{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:1px 7px;border-radius:var(--radius-sm);border:1px solid var(--hairline-strong);
+  font:var(--text-micro)/1.6 var(--mono);color:var(--ink-muted);white-space:nowrap;
+}
+.c-tag[data-tone=indexed]{color:var(--indexed);border-color:#2A3B52;background:var(--indexed-wash)}
+.c-tag[data-tone=caution]{color:var(--caution);border-color:#4A3C1E;background:var(--caution-wash)}
+.c-tag[data-tone=refused]{color:var(--refused);border-color:#4A2B28;background:var(--refused-wash)}
+.c-tag[data-tone=accent]{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-wash)}
+
+/* ---- surfaces: used when something really is a separate object -------- */
+.c-panel{background:var(--surface-1);border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:var(--s5)}
+.c-rule{border:0;border-top:1px solid var(--hairline);margin:var(--s6) 0}
+
+/* ---- notices: say what happened and what it means --------------------- */
+.c-notice{
+  display:flex;gap:var(--s3);padding:var(--s3) var(--s4);
+  border-left:2px solid var(--hairline-loud);background:var(--surface-1);
+  font-size:var(--text-fine);line-height:1.6;color:var(--ink-muted);
+}
+.c-notice[data-tone=caution]{border-left-color:var(--caution);background:var(--caution-wash)}
+.c-notice[data-tone=refused]{border-left-color:var(--refused);background:var(--refused-wash)}
+.c-notice[data-tone=indexed]{border-left-color:var(--indexed);background:var(--indexed-wash)}
+
+/* A gap is drawn, not hidden: hatching says "deliberately empty", not "broken". */
+.c-gap{
+  border:1px dashed var(--hairline-strong);padding:var(--s4);border-radius:var(--radius);
+  background:repeating-linear-gradient(135deg,var(--canvas),var(--canvas) 6px,#0A0E13 6px,#0A0E13 12px);
+}
+.c-gap strong{display:block;font-weight:500;font-size:var(--text-small);color:var(--ink);margin-bottom:var(--s1)}
+.c-gap p{font-size:var(--text-fine);line-height:1.6;color:var(--ink-subtle);max-width:74ch}
+
+/* ---- tables ----------------------------------------------------------- */
+.c-table-wrap{overflow-x:auto;overscroll-behavior-x:contain}
+.c-table{width:100%;border-collapse:collapse;font-size:var(--text-small)}
+.c-table th{
+  text-align:left;font:500 var(--text-micro)/1.4 var(--sans);letter-spacing:.02em;color:var(--ink-subtle);
+  padding:0 var(--s3) var(--s2) 0;border-bottom:1px solid var(--hairline-strong);white-space:nowrap;
+}
+.c-table td{padding:var(--s3) var(--s3) var(--s3) 0;border-bottom:1px solid var(--hairline);vertical-align:top}
+.c-table tbody tr{transition:background var(--fast) var(--ease)}
+.c-table tbody tr:hover{background:var(--surface-1)}
+.c-table td.c-num,.c-table th.c-num{text-align:right;padding-right:var(--s4)}
+
+/* ---- skeletons: hold the layout, never an empty card ------------------ */
+.c-skel{background:var(--surface-2);border-radius:var(--radius-sm);height:1em;animation:c-pulse 1.3s var(--ease) infinite}
+@keyframes c-pulse{0%,100%{opacity:.5}50%{opacity:.85}}
+@media (prefers-reduced-motion:reduce){.c-skel{animation:none;opacity:.6}}
+
+.c-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

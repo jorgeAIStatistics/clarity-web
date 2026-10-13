@@ -1,0 +1,23 @@
+/* The explorer's own page furniture: a page head that is a heading and a sentence, not a card. */
+.ev-pagehead{margin-bottom:var(--s5)}
+.ev-pagehead h1{outline:none;margin-bottom:var(--s3)}
+
+.ev-domainrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2);margin-bottom:var(--s6)}
+.ev-domainrow .c-note{flex-basis:100%;margin-bottom:var(--s1)}
+
+.ev-filters{
+  display:grid;grid-template-columns:minmax(220px,2fr) repeat(2,minmax(140px,1fr));
+  gap:var(--s3);align-items:end;margin-bottom:var(--s4);
+}
+.ev-search{min-width:0}
+.ev-browser-status{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s3)}
+.ev-browser-status p{font-size:var(--text-small);color:var(--ink)}
+
+.ev-frameworks{margin-top:var(--s8);padding-top:var(--s5);border-top:1px solid var(--hairline-strong)}
+.ev-frameworks h2{margin-bottom:var(--s4)}
+.ev-frameworks>p{margin-top:var(--s4);font-size:var(--text-small)}
+
+@media (max-width:760px){
+  .ev-filters{grid-template-columns:1fr 1fr}
+  .ev-search{grid-column:1/-1}
+}

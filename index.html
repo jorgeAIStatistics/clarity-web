@@ -2,19 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Clarity — Health Evidence Platform</title>
-    <!-- Fonts the design system expects: Space Grotesk (display), JetBrains Mono (numeric) -->
+    <meta name="description" content="Clarity reads biomedical literature into typed findings with their estimates, intervals, populations, provenance and source passages — and says plainly what it does not hold." />
+    <!--
+      Three faces, three jobs: Plex Sans is Clarity's own voice, Plex Serif is what a source said,
+      Plex Mono is an identifier or a number. The distinction is structural, not decorative.
+    -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <style>
-      * { box-sizing: border-box; }
+      /* Painted before the bundle arrives so a slow load is dark, not a white flash. */
       html, body, #root { margin: 0; padding: 0; min-height: 100%; }
-      body { background: #0A0D14; }
+      body { background: #07090C; color: #E8EDF2; }
     </style>
   </head>
   <body>
