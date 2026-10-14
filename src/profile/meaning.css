@@ -8,7 +8,7 @@
 .mp :is(a,button,summary):focus-visible{outline:3px solid #c0a7ff;outline-offset:3px;border-radius:4px}
 .mp button{font:inherit;font-size:13px;color:var(--mp-ink);background:#132430;border:1px solid var(--mp-line);border-radius:8px;padding:8px 12px;cursor:pointer;transition:background-color .15s,border-color .15s}
 .mp button:hover{background:#1c3442;border-color:var(--hairline-loud)}
-.mp button[aria-pressed=true]{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.mp button[aria-pressed=true]{background:var(--accent-wash);border-color:var(--accent);color:var(--accent)}
 .mp blockquote{margin:8px 0;padding:10px 14px;border-left:2px solid var(--accent);background:#12283450;font-size:13.5px;line-height:1.6;color:var(--mp-soft)}
 .mp-eyebrow{font:600 11px/1.3 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--mp-muted);margin:0}
 .mp-head{padding:4px 0 16px}
