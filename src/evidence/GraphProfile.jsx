@@ -51,15 +51,18 @@ export function useGraphEntity(slug,type='biomarker',attempt=0){
   const [state,setState]=useState({status:'loading'});
   useEffect(()=>{
     if(!slug){setState({status:'missing'});return undefined;}
-    let active=true,inFlight=null,waiting=null;
+    let active=true,inFlight=null,waiting=null,painted=false;
     setState({status:'loading'});
+
     // Variants and genes share the biomarker address space; a biomarker id wins when both exist.
+    const candidates=graphCandidates(type,slug);
+
     const once=async()=>{
       // Each attempt gets its own controller: a timed-out signal cannot be reused by the next try.
       const controller=new AbortController();inFlight=controller;
       const timer=setTimeout(()=>controller.abort(),15000);
       try{
-        for(const candidate of graphCandidates(type,slug)){
+        for(const candidate of candidates){
           const response=await fetch(`${API_BASE}/api/evidence/graph/entity/${encodeURIComponent(candidate)}`,{signal:controller.signal});
           if(response.status===404)continue;
           if(!response.ok)throw Object.assign(Error('request_failed'),{outcome:response.status});
@@ -68,16 +71,36 @@ export function useGraphEntity(slug,type='biomarker',attempt=0){
         return null;
       }finally{clearTimeout(timer);}
     };
+
+    // The published copy is served from this origin and lands in milliseconds, so it goes up first
+    // and the live read replaces it if it arrives. Waiting for three 15-second attempts and their
+    // delays before even looking at the copy is what put fifty seconds of skeleton in front of a
+    // page the site was already carrying.
+    const copy=bundledProfile(candidates).catch(()=>null);
+    copy.then(bundled=>{
+      if(active&&bundled&&!painted){painted=true;setState({status:'ready',data:bundled});}
+    });
+
     fetchWithRetry(once,{
       sleep:ms=>new Promise(resolve=>{waiting=setTimeout(resolve,ms);}),
-      onRetry:tries=>{if(active)setState({status:'retrying',attempt:tries});},
-    }).then(data=>{if(active)setState(data?{status:'ready',data}:{status:'missing'});})
-      .catch(async()=>{
-        // Nothing answered. A few profiles are built into this site precisely for this: a first
-        // landing should be a page with Q1 on it, not a skeleton that waits for a container to boot.
-        const bundled=await bundledProfile(graphCandidates(type,slug));
-        if(active)setState(bundled?{status:'ready',data:bundled}:{status:'error'});
+      // A retry notice would overwrite a page the reader is already reading.
+      onRetry:tries=>{if(active&&!painted)setState({status:'retrying',attempt:tries});},
+    }).then(data=>{
+        if(!active)return;
+        if(data){painted=true;setState({status:'ready',data});return;}
+        // The graph answered 404 for every candidate. A published copy is still a record of what
+        // was there; only say "no such page" when neither has it.
+        if(!painted)copy.then(bundled=>{
+          if(active)setState(bundled?{status:'ready',data:bundled}:{status:'missing'});
+        });
+      })
+      .catch(()=>{
+        if(!active||painted)return;  // nothing answered, but the copy is already on screen
+        copy.then(bundled=>{
+          if(active)setState(bundled?{status:'ready',data:bundled}:{status:'error'});
+        });
       });
+
     return()=>{active=false;clearTimeout(waiting);inFlight?.abort();};
   },[slug,type,attempt]);
   return state;

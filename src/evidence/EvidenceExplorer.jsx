@@ -71,13 +71,16 @@ export default function EvidenceExplorer({path,go,onHome,onResearch}){
 
  return <Shell go={go} section={section} crumbs={crumbs}>
   <div className="ev" lang="en">
-   {!entity&&<header className="ev-pagehead">
+   {/* Every page names itself. A curated entity gets the same masthead as an index — dropping it
+       for entities left those pages with no h1 at all, and the record's name only in a breadcrumb. */}
+   <header className="ev-pagehead">
      <h1 ref={heading} tabIndex={-1}>{title}</h1>
      <p className="c-lede">{matcher?'Map a research question across the five evidence layers, then place your own results on it.'
+       :entity?entity.evidence_question
        :root==='conditions'?'Follow a clinical question across measurements, tests, and treatment evidence.'
        :selectedType?catalog.frameworks[selectedType].question
        :'Understand what a measurement means, how well a test performs, and whether using it changes outcomes.'}</p>
-   </header>}
+   </header>
 
    {graphSlug?null
    :root==='explore'&&!segments[1]?<>
@@ -124,7 +127,8 @@ export default function EvidenceExplorer({path,go,onHome,onResearch}){
        </div>
        {graph.published&&graphRoot.length>0&&<div className="c-notice" data-tone="caution" role="status">{graph.published}</div>}
 
-       {items.length>0&&<div className="ev-grid">{items.map(e=><EntityCard key={e.id} entity={e} go={go}/>)}</div>}
+       {items.length>0&&<><h2 className="c-sr">Matching profiles</h2>
+         <div className="ev-grid">{items.map(e=><EntityCard key={e.id} entity={e} go={go}/>)}</div></>}
        {!items.length&&!graphItems.length&&<div className="c-gap"><strong>No profile matches these filters.</strong><p>Clear a filter or try an alias. An empty result is a statement about this library, not about the literature.</p></div>}
      </section>
 
