@@ -165,3 +165,9 @@ for counts, provenance, scope and export commands.
 Verification: `node --test src/platform/*.test.js src/evidence/*.test.js` and
 `npm run build`; browser checks cover CSV/TSV preparation, header correction, research
 attestation, ranked results, pending states and mobile profile layout.
+
+## Ownership and permissions
+
+Maintained by **Jorge Rodriguez** ([@jorgeAIStatistics](https://github.com/jorgeAIStatistics)).
+See [COPYRIGHT.md](COPYRIGHT.md) for ownership and third-party attribution scope,
+and [LICENSE](LICENSE) for permissions. Source-visible for portfolio review; reuse rights are reserved.
